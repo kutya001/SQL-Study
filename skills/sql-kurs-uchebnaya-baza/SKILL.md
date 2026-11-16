@@ -61,6 +61,32 @@ node tools/validate-packs.js              # все базы вместе (про
 node tools/build-index.js
 ```
 
+**Если папки `tools/` нет** (старый архив курса `SELECT_kurs.zip`) — сохрани рядом этот скрипт и запусти `node check_pack.js ПАПКА_КУРСА ПАПКА_БАЗЫ`:
+
+```js
+// node check_pack.js <папка курса> <папка базы>
+globalThis.window = globalThis;
+const fs = require('fs'), path = require('path');
+const [course, packDir] = process.argv.slice(2);
+['js/engine/tsql-core.js', 'js/engine/tsql-parser.js', 'js/engine/tsql-funcs.js', 'js/engine/tsql-exec.js', 'js/engine/bankdb.js', 'js/engine/packs.js', 'content/course.js']
+  .forEach(f => require(path.resolve(course, f)));
+globalThis.Store = { readSchemas: async () => [], localPacks: async () => ({}) };
+require(path.resolve(course, 'js/app/checker.js'));
+require(path.resolve(course, 'js/app/registry.js'));
+function tree(d, p, o) { for (const n of fs.readdirSync(d)) { const f = path.join(d, n); if (fs.statSync(f).isDirectory()) tree(f, p + n + '/', o); else if (/\.(json|csv)$/i.test(n)) o[p + n] = fs.readFileSync(f, 'utf8'); } return o; }
+const PF = globalThis.PackFormat, R = globalThis.Packs;
+const bank = PF.builtinBank({ modules: [], trainer: { tasks: [] } }); PF.getDb(bank);
+const pack = R.fromFiles(path.basename(path.resolve(packDir)), tree(path.resolve(packDir), '', {}), 'folder');
+const r = PF.validate(pack, { dbs: { bank: bank.db } });
+console.log(pack.id, pack.dbName, JSON.stringify(PF.counts(pack)), 'строк:', pack.rowCount);
+r.errors.forEach(e => console.log('ОШИБКА', e.where, '—', e.msg));
+r.warnings.forEach(e => console.log('замечание', e.where, '—', e.msg));
+console.log('проверено', JSON.stringify(r.counts), '| ошибок', r.errors.length, '| замечаний', r.warnings.length);
+process.exit(r.errors.length ? 1 : 0);
+```
+
+Разведка данных без `tools/sql.js` — тот же загрузчик и `TSQL.execute(sql, PF.getDb(pack), { dbs: { bank: bank.db, [pack.dbName.toLowerCase()]: pack.db } })`; результат в `r.results[i].columns/rows`, ошибка в `r.error`.
+
 ## 5. Сдача
 - **В репозиторий** (если есть доступ): ветка `baza-ИМЯ`, коммит с папкой `schemas/ИМЯ/`, генератором `tools/generators/gen_ИМЯ.js` и обновлённым `schemas/index.js`; pull request с описанием базы. После слияния GitHub Actions проверит всё и опубликует сайт.
 - **Архивом**: упакуй папку базы в zip через Python `zipfile` (он ставит флаг UTF-8 для кириллических имён; `zip` из Info-ZIP — нет). В архиве — одна папка с именем, равным `id` (латиница, без `_` в начале). Пользователь распаковывает её в `schemas/` и на странице «Базы» нажимает «Обновить» (или «Добавить базу (папка)»), затем «Проверить задания» и отмечает «Изучаю».
