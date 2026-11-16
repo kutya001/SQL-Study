@@ -1,0 +1,94 @@
+{
+  "modules": [
+    {
+      "id": "m1",
+      "title": "Знакомство с карго-доставкой",
+      "short": "Отправление и его путь, стоимость по тарифу, рейсы и сроки доставки.",
+      "goal": "Разберёмся, как в данных выглядит путь посылки: приём на точке, рейс, прибытие, выдача получателю. Научимся проверять стоимость по тарифу и считать, доставлено ли отправление в срок.",
+      "lessons": [
+        {
+          "id": "l1", "title": "Отправление и тариф", "minutes": 12,
+          "steps": [
+            { "t": "text", "title": "Путь посылки",
+              "text": [
+                "Клиент приносит посылку на точку — в таблице `Shipments` появляется строка с трек-номером, точкой приёма (`FromWarehouseID`), точкой назначения (`ToWarehouseID`), тарифом, весом и временем приёма `CreatedAt`.",
+                "",
+                "Дальше посылку ставят на **рейс** (`TripID` → таблица `Trips`). Рейсы ходят между хабами и складами, а пункты выдачи подчинены им (`Warehouses.ParentID`). Когда получатель забирает посылку, заполняется `DeliveredAt` и статус становится «Выдан».",
+                "",
+                "> **Стоимость доставки.** `Cost` = большее из `WeightKg * PricePerKg` и `MinPrice` тарифа. Лёгкая посылка всё равно стоит не меньше минимальной цены."
+              ] },
+            { "t": "example", "title": "Тарифы",
+              "sql": "SELECT TariffID, TariffName, Transport, PricePerKg, MinPrice, DaysNorm, IsActive FROM Tariffs;" },
+            { "t": "example", "title": "Проверяем формулу стоимости",
+              "text": "Посчитаем стоимость по весу и сравним с `Cost`: для лёгких посылок сработала минимальная цена.",
+              "sql": ["SELECT TOP (10) s.TrackNo, s.WeightKg, t.PricePerKg, t.MinPrice,", "       s.WeightKg * t.PricePerKg AS ByWeight, s.Cost", "FROM Shipments s", "JOIN Tariffs t ON t.TariffID = s.TariffID", "WHERE s.CreatedAt >= '20261030' AND s.CreatedAt < '20261031';"] },
+            { "t": "quiz", "id": "q1", "title": "Сколько стоит посылка",
+              "q": "Посылка весит 2 кг, тариф «Стандарт (авто)»: 180 сом за кг, минимальная стоимость 600 сом. Сколько стоит доставка?",
+              "options": ["360 сом", "600 сом", "780 сом", "180 сом"],
+              "answer": 1,
+              "explain": "По весу: 2 × 180 = 360 сом — меньше минимума. Берём большее из двух: 600 сом." },
+            { "t": "task", "id": "t1", "title": "Стоимость своими руками",
+              "text": "Для отправлений, принятых 30 октября 2026 года, выведите `TrackNo`, `Cost` и рассчитанную стоимость `CalcCost` = большее из `WeightKg * PricePerKg` и `MinPrice` (через CASE).",
+              "solution": ["SELECT s.TrackNo, s.Cost,", "       CASE WHEN s.WeightKg * t.PricePerKg > t.MinPrice THEN s.WeightKg * t.PricePerKg ELSE t.MinPrice END AS CalcCost", "FROM Shipments s", "JOIN Tariffs t ON t.TariffID = s.TariffID", "WHERE s.CreatedAt >= '20261030' AND s.CreatedAt < '20261031';"],
+              "alsoOk": ["SELECT s.TrackNo, s.Cost, GREATEST(s.WeightKg * t.PricePerKg, t.MinPrice) AS CalcCost FROM Shipments s JOIN Tariffs t ON t.TariffID = s.TariffID WHERE s.CreatedAt >= '20261030' AND s.CreatedAt < '20261031';"],
+              "check": { "names": true } }
+          ],
+          "training": [
+            { "t": "quiz", "id": "tq1",
+              "q": "У посылки `TripID` равен NULL. Что это может значить?",
+              "options": ["Посылка уже выдана", "Посылку ещё не поставили на рейс или отправление отменили", "Посылка утеряна в пути", "Рейс прибыл"],
+              "answer": 1,
+              "explain": "NULL в `TripID` — рейс не назначен: посылка ждёт ближайшего рейса или отправление отменено." },
+            { "t": "task", "id": "tt1", "title": "Выручка октября",
+              "text": "Посчитайте выручку за октябрь 2026 года — сумму `Cost` отправлений, принятых в октябре, кроме отменённых. Столбец — `Revenue`.",
+              "solution": "SELECT SUM(Cost) AS Revenue FROM Shipments WHERE Status <> N'Отменён' AND CreatedAt >= '20261001' AND CreatedAt < '20261101';",
+              "wrong": ["SELECT SUM(Cost) AS Revenue FROM Shipments WHERE CreatedAt >= '20261001' AND CreatedAt < '20261101';"],
+              "check": { "names": true } }
+          ]
+        },
+        {
+          "id": "l2", "title": "Рейсы и сроки", "minutes": 12,
+          "steps": [
+            { "t": "text", "title": "Когда посылка доставлена в срок",
+              "text": [
+                "У рейса есть время отправления `DepartAt` и фактическое прибытие `ArriveAt`. Пока рейс в пути или только запланирован, `ArriveAt` равно **NULL**.",
+                "",
+                "Срок доставки считаем от приёма посылки до прибытия её рейса: `DATEDIFF(day, s.CreatedAt, t.ArriveAt)`. Если он не больше `DaysNorm` тарифа — доставлено в срок.",
+                "",
+                "! `DATEDIFF(day, …)` считает, сколько раз сменилась календарная дата, а не полные сутки: с 23:00 до 01:00 следующего дня — это уже 1 день."
+              ] },
+            { "t": "widget", "title": "Как считает DATEDIFF", "w": "dateDiffViz",
+              "text": "Поиграйте с датами: DATEDIFF считает пересечённые границы дней, месяцев и лет." },
+            { "t": "example", "title": "Рейсы по статусам",
+              "sql": ["SELECT Status, Transport, COUNT(*) AS Trips,", "       SUM(CASE WHEN ArriveAt IS NULL THEN 1 ELSE 0 END) AS NoArrival", "FROM Trips", "GROUP BY Status, Transport;"] },
+            { "t": "task", "id": "t2", "title": "Опоздавшие экспрессы",
+              "text": "Сколько отправлений по тарифу «Экспресс (авиа)» (`TariffID = 3`), принятых в 2026 году, прибыли позже нормативного срока? Столбец — `Late`.",
+              "solution": ["SELECT COUNT(*) AS Late", "FROM Shipments s", "JOIN Trips t ON t.TripID = s.TripID", "JOIN Tariffs tr ON tr.TariffID = s.TariffID", "WHERE s.TariffID = 3 AND s.CreatedAt >= '20260101' AND s.CreatedAt < '20270101'", "  AND DATEDIFF(day, s.CreatedAt, t.ArriveAt) > tr.DaysNorm;"],
+              "check": { "names": true } }
+          ],
+          "training": [
+            { "t": "order", "id": "to1",
+              "q": "Расставьте события в жизни посылки по порядку:",
+              "items": ["Приём на точке (CreatedAt)", "Отправление рейса (DepartAt)", "Прибытие рейса (ArriveAt)", "Выдача получателю (DeliveredAt)"],
+              "explain": "Посылку принимают, ставят на рейс, рейс прибывает, получатель забирает посылку." },
+            { "t": "task", "id": "tt2", "title": "Рейсы в пути",
+              "text": "Выведите номер, транспорт и время отправления рейсов, которые уже отправились, но ещё не прибыли (на 31.10.2026).",
+              "solution": "SELECT TripNo, Transport, DepartAt FROM Trips WHERE ArriveAt IS NULL AND DepartAt <= '20261031 23:59:59' AND Status <> N'Отменён';",
+              "alsoOk": ["SELECT TripNo, Transport, DepartAt FROM Trips WHERE Status = N'В пути';"] }
+          ]
+        }
+      ],
+      "homework": [
+        { "id": "hw1", "title": "Средний срок по направлениям",
+          "text": "Для отправлений 2026 года, чей рейс уже прибыл, выведите страну назначения `Country`, число отправлений `Shipments` и средний срок доставки в днях `AvgDays` (`DECIMAL(6,2)`), от самого долгого.",
+          "solution": ["SELECT w.Country, COUNT(*) AS Shipments, CAST(AVG(DATEDIFF(day, s.CreatedAt, t.ArriveAt) * 1.0) AS DECIMAL(6,2)) AS AvgDays", "FROM Shipments s", "JOIN Trips t ON t.TripID = s.TripID", "JOIN Warehouses w ON w.WarehouseID = s.ToWarehouseID", "WHERE t.ArriveAt IS NOT NULL AND s.CreatedAt >= '20260101' AND s.CreatedAt < '20270101'", "GROUP BY w.Country", "ORDER BY AvgDays DESC;"],
+          "hint": "`DATEDIFF` возвращает целое число, а `AVG` по целым — тоже целое. Умножьте на `1.0`.",
+          "check": { "names": true, "order": [[2, "desc"]] } },
+        { "id": "hw2", "title": "Невостребованные посылки",
+          "text": "Выведите трек-номер, точку назначения и дату прибытия рейса для посылок со статусом «Возврат» или «Прибыл», отсортировав по дате прибытия.",
+          "solution": ["SELECT s.TrackNo, w.WarehouseName, t.ArriveAt", "FROM Shipments s", "JOIN Trips t ON t.TripID = s.TripID", "JOIN Warehouses w ON w.WarehouseID = s.ToWarehouseID", "WHERE s.Status IN (N'Возврат', N'Прибыл')", "ORDER BY t.ArriveAt;"],
+          "check": { "order": [[2, "asc"]] } }
+      ]
+    }
+  ]
+}

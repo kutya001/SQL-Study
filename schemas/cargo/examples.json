@@ -1,0 +1,23 @@
+{
+  "examples": [
+    { "title": "Точки компании и подчинение",
+      "sql": ["SELECT w.WarehouseID, w.WarehouseName, w.Kind, w.Country, p.WarehouseName AS Parent", "FROM Warehouses w", "LEFT JOIN Warehouses p ON p.WarehouseID = w.ParentID", "ORDER BY w.Country, w.Kind;"] },
+    { "title": "Отследить посылку",
+      "sql": ["SELECT s.TrackNo, s.Status, s.CreatedAt, wf.WarehouseName AS FromPoint, wt.WarehouseName AS ToPoint,", "       t.TripNo, t.DepartAt, t.ArriveAt, s.DeliveredAt", "FROM Shipments s", "JOIN Warehouses wf ON wf.WarehouseID = s.FromWarehouseID", "JOIN Warehouses wt ON wt.WarehouseID = s.ToWarehouseID", "LEFT JOIN Trips t ON t.TripID = s.TripID", "WHERE s.TrackNo = 'CRG100111057';"] },
+    { "title": "Как считается стоимость",
+      "sql": ["SELECT TOP (20) s.TrackNo, s.WeightKg, t.TariffName, t.PricePerKg, t.MinPrice,", "       s.WeightKg * t.PricePerKg AS ByWeight, s.Cost", "FROM Shipments s", "JOIN Tariffs t ON t.TariffID = s.TariffID", "ORDER BY s.ShipmentID DESC;"] },
+    { "title": "Выручка по месяцам",
+      "sql": ["SELECT FORMAT(CreatedAt, 'yyyy-MM') AS Mon, COUNT(*) AS Shipments, CAST(SUM(Cost) AS DECIMAL(18,2)) AS Revenue", "FROM Shipments", "WHERE Status <> N'Отменён'", "GROUP BY FORMAT(CreatedAt, 'yyyy-MM')", "ORDER BY Mon;"] },
+    { "title": "Рейсы в пути и запланированные",
+      "sql": ["SELECT t.TripNo, t.Transport, wf.WarehouseName AS FromPoint, wt.WarehouseName AS ToPoint, t.DepartAt, t.Status,", "       (SELECT COUNT(*) FROM Shipments s WHERE s.TripID = t.TripID) AS Parcels", "FROM Trips t", "JOIN Warehouses wf ON wf.WarehouseID = t.FromWarehouseID", "JOIN Warehouses wt ON wt.WarehouseID = t.ToWarehouseID", "WHERE t.Status IN (N'В пути', N'Запланирован')", "ORDER BY t.DepartAt;"] },
+    { "title": "Доставка в срок по тарифам",
+      "sql": ["SELECT tr.TariffName, tr.DaysNorm, COUNT(*) AS Arrived,", "       AVG(DATEDIFF(day, s.CreatedAt, t.ArriveAt) * 1.0) AS AvgDays,", "       SUM(CASE WHEN DATEDIFF(day, s.CreatedAt, t.ArriveAt) <= tr.DaysNorm THEN 1 ELSE 0 END) AS OnTime", "FROM Shipments s", "JOIN Trips t ON t.TripID = s.TripID", "JOIN Tariffs tr ON tr.TariffID = s.TariffID", "WHERE t.ArriveAt IS NOT NULL", "GROUP BY tr.TariffName, tr.DaysNorm;"] },
+    { "title": "Претензии на рассмотрении",
+      "sql": ["SELECT c.ClaimID, c.ClaimDate, c.Reason, s.TrackNo, cu.CustomerName, s.DeclaredValue", "FROM Claims c", "JOIN Shipments s ON s.ShipmentID = c.ShipmentID", "JOIN Customers cu ON cu.CustomerID = s.CustomerID", "WHERE c.Status = N'На рассмотрении';"] },
+    { "title": "Две базы: клиенты карго — клиенты банка",
+      "sql": ["-- Таблица другой базы: ИмяБазы.dbo.Таблица", "SELECT c.CustomerName, c.Phone, b.ClientID AS BankClientID, COUNT(s.ShipmentID) AS Shipments", "FROM Cargo.dbo.Customers c", "JOIN Bank.dbo.Clients b ON b.Phone = c.Phone", "LEFT JOIN Cargo.dbo.Shipments s ON s.CustomerID = c.CustomerID", "GROUP BY c.CustomerName, c.Phone, b.ClientID", "ORDER BY Shipments DESC;"] },
+    { "title": "USE: переключение базы",
+      "sql": ["USE Bank;", "SELECT DB_NAME() AS CurrentDb, COUNT(*) AS Clients FROM Clients;"],
+      "note": "После выполнения песочница переключится на базу Bank — как в SSMS." }
+  ]
+}

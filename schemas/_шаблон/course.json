@@ -1,0 +1,37 @@
+{
+  "modules": [
+    {
+      "id": "m1",
+      "title": "Знакомство с библиотекой",
+      "short": "Пример модуля с уроком, вопросом и заданием.",
+      "goal": "Покажем, из каких шагов состоит урок: текст, пример, вопрос, задание, мини-тренировка и домашнее задание.",
+      "lessons": [
+        {
+          "id": "l1", "title": "Авторы и книги", "minutes": 5,
+          "steps": [
+            { "t": "text", "title": "Две таблицы",
+              "text": ["В базе две таблицы: `Authors` и `Books`. Книга ссылается на автора через `AuthorID`.", "", "> **Совет.** Схему таблиц всегда можно открыть в разделе «Схема»."] },
+            { "t": "example", "title": "Посмотрим на книги", "sql": "SELECT * FROM Books;" },
+            { "t": "quiz", "id": "q1", "q": "Какой столбец связывает книгу с автором?",
+              "options": ["`BookID`", "`AuthorID`", "`Title`"], "answer": 1,
+              "explain": "`Books.AuthorID` хранит код автора из `Authors.AuthorID`." },
+            { "t": "task", "id": "t1", "title": "Книги Айтматова",
+              "text": "Выведите названия книг автора с кодом 1.",
+              "solution": "SELECT Title FROM Books WHERE AuthorID = 1;" }
+          ],
+          "training": [
+            { "t": "task", "id": "tt1", "title": "Сколько книг",
+              "text": "Сколько всего книг в библиотеке? Столбец — `Cnt`.",
+              "solution": "SELECT COUNT(*) AS Cnt FROM Books;",
+              "check": { "names": true } }
+          ]
+        }
+      ],
+      "homework": [
+        { "id": "hw1", "title": "Новые поступления",
+          "text": "Выведите названия книг, поступивших в библиотеку в 2025 году и позже.",
+          "solution": "SELECT Title FROM Books WHERE AddedDate >= '20250101';" }
+      ]
+    }
+  ]
+}

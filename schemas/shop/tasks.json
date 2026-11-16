@@ -1,0 +1,489 @@
+{
+  "sets": [
+    {
+      "id": "s1",
+      "title": "Первые запросы к магазину",
+      "short": "SELECT, WHERE, ORDER BY, TOP, DISTINCT на данных розничной сети.",
+      "desc": "Разминка на новой базе: выбираем столбцы, фильтруем и сортируем. Таблицы и столбцы смотрите на схеме базы **Shop**.",
+      "tasks": [
+        {
+          "id": "s1-1",
+          "title": "Все магазины",
+          "text": "Выведите название, город и формат всех магазинов сети (`StoreName`, `City`, `Format`).",
+          "solution": "SELECT StoreName, City, Format FROM Stores;"
+        },
+        {
+          "id": "s1-2",
+          "title": "Магазины Бишкека по площади",
+          "text": "Выведите название и площадь (`AreaSqm`) магазинов в Бишкеке — от самого большого к самому маленькому.",
+          "solution": "SELECT StoreName, AreaSqm FROM Stores WHERE City = N'Бишкек' ORDER BY AreaSqm DESC;",
+          "check": {
+            "order": [
+              [
+                1,
+                "desc"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "s1-3",
+          "title": "Дорогие товары",
+          "text": "Выведите наименование и цену товаров дороже 500 сом, от дорогих к дешёвым.",
+          "solution": "SELECT ProductName, Price FROM Products WHERE Price > 500 ORDER BY Price DESC;",
+          "check": {
+            "order": [
+              [
+                1,
+                "desc"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "s1-4",
+          "title": "Весовые товары",
+          "text": "Выведите наименование и цену товаров, которые продаются на вес (единица измерения — `кг`), в алфавитном порядке.",
+          "solution": "SELECT ProductName, Price FROM Products WHERE Unit = N'кг' ORDER BY ProductName;",
+          "check": {
+            "order": [
+              [
+                0,
+                "asc"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "s1-5",
+          "title": "Пять самых дешёвых",
+          "text": "Выведите 5 самых дешёвых товаров, которые сейчас в продаже (`IsActive = 1`): наименование и цену, от дешёвых к дорогим.",
+          "solution": "SELECT TOP (5) ProductName, Price FROM Products WHERE IsActive = 1 ORDER BY Price, ProductID;",
+          "hint": "`TOP (5)` берёт первые 5 строк **после** сортировки, поэтому без `ORDER BY Price` не обойтись.",
+          "check": {
+            "order": [
+              [
+                1,
+                "asc"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "s1-6",
+          "title": "Главный в сети",
+          "text": "Выведите ФИО и должность сотрудника, у которого нет руководителя (`ManagerID` не заполнен).",
+          "solution": "SELECT FullName, Position FROM Employees WHERE ManagerID IS NULL;",
+          "hint": "Пустое значение проверяется через `IS NULL`, а не через `= NULL`."
+        },
+        {
+          "id": "s1-7",
+          "title": "Справочник брендов",
+          "text": "Выведите список брендов без повторов и без пустых значений, по алфавиту.",
+          "solution": "SELECT DISTINCT Brand FROM Products WHERE Brand IS NOT NULL ORDER BY Brand;",
+          "check": {
+            "order": [
+              [
+                0,
+                "asc"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Функции, NULL и даты",
+      "short": "IIF и CASE, вычисления, работа с датой и временем покупки.",
+      "desc": "Задачи на функции. Помните: `OrderDate` — это **дата и время**, поэтому период задаём диапазоном `>= начало AND < начало следующего`.",
+      "tasks": [
+        {
+          "id": "s2-1",
+          "title": "Покупатели без телефона",
+          "text": "Выведите имя (`FullName`) и город покупателей, у которых не указан телефон.",
+          "solution": "SELECT FullName, City FROM Customers WHERE Phone IS NULL;"
+        },
+        {
+          "id": "s2-2",
+          "title": "Есть ли карта",
+          "text": "Для покупателей из Каракола выведите `FullName` и столбец `HasCard`: «Да», если номер карты лояльности указан, иначе «Нет».",
+          "solution": "SELECT FullName, IIF(CardNumber IS NULL, N'Нет', N'Да') AS HasCard FROM Customers WHERE City = N'Каракол';",
+          "alsoOk": [
+            "SELECT FullName, CASE WHEN CardNumber IS NOT NULL THEN N'Да' ELSE N'Нет' END AS HasCard FROM Customers WHERE City = N'Каракол';"
+          ],
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s2-3",
+          "title": "Наценка",
+          "text": "Выведите наименование, цену, закупочную цену и наценку в процентах `MarkupPct` = (цена − закупочная) / закупочная × 100, округлённую до 2 знаков (тип `DECIMAL(6,2)`).",
+          "solution": "SELECT ProductName, Price, CostPrice, CAST((Price - CostPrice) / CostPrice * 100 AS DECIMAL(6,2)) AS MarkupPct FROM Products;",
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s2-4",
+          "title": "Чеки 8 марта",
+          "text": "Выведите номер, дату-время и магазин всех чеков за 8 марта 2026 года.",
+          "solution": "SELECT OrderID, OrderDate, StoreID FROM Orders WHERE OrderDate >= '20260308' AND OrderDate < '20260309';",
+          "hint": "Условие `OrderDate = '20260308'` найдёт только покупки ровно в полночь. Нужен диапазон."
+        },
+        {
+          "id": "s2-5",
+          "title": "В котором часу",
+          "text": "Для оплаченных чеков магазина 1 за октябрь 2026 выведите `OrderID` и час покупки `Hr` (число от 0 до 23).",
+          "solution": "SELECT OrderID, DATEPART(hour, OrderDate) AS Hr FROM Orders WHERE StoreID = 1 AND Status = N'Оплачен' AND OrderDate >= '20261001' AND OrderDate < '20261101';",
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s2-6",
+          "title": "Полных лет стажа",
+          "text": "Выведите ФИО, дату приёма и число **полных** лет работы на 1 ноября 2026 года — `YearsWorked`.",
+          "solution": [
+            "SELECT FullName, HireDate,",
+            "       DATEDIFF(year, HireDate, '20261101')",
+            "         - CASE WHEN DATEADD(year, DATEDIFF(year, HireDate, '20261101'), HireDate) > '20261101' THEN 1 ELSE 0 END AS YearsWorked",
+            "FROM Employees;"
+          ],
+          "hint": "`DATEDIFF(year, …)` считает смены календарного года, а не полные годы. Вычтите 1, если «годовщина» в 2026 году ещё не наступила.",
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s2-7",
+          "title": "Возрастные группы",
+          "text": [
+            "Для каждого покупателя выведите `FullName` и `AgeGroup`:",
+            "- «до 30» — родился позже 1 ноября 1996 года;",
+            "- «30–45» — родился позже 1 ноября 1981 года;",
+            "- «старше 45» — остальные;",
+            "- «не указан» — дата рождения не заполнена."
+          ],
+          "solution": [
+            "SELECT FullName,",
+            "       CASE WHEN BirthDate IS NULL THEN N'не указан'",
+            "            WHEN BirthDate > '19961101' THEN N'до 30'",
+            "            WHEN BirthDate > '19811101' THEN N'30–45'",
+            "            ELSE N'старше 45' END AS AgeGroup",
+            "FROM Customers;"
+          ],
+          "hint": "Проверку на NULL поставьте первой: сравнение NULL с датой не даёт ни TRUE, ни FALSE.",
+          "check": {
+            "names": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "Продажи: группировка и соединения",
+      "short": "GROUP BY, HAVING, JOIN нескольких таблиц, поиск «чего нет».",
+      "desc": "Считаем продажи. Выручка позиции = `Quantity * Price * (1 - DiscountPct / 100)`, учитываем только чеки со статусом «Оплачен».",
+      "tasks": [
+        {
+          "id": "s3-1",
+          "title": "Чеки по статусам",
+          "text": "Сколько чеков в каждом статусе? Выведите `Status` и `Cnt`.",
+          "solution": "SELECT Status, COUNT(*) AS Cnt FROM Orders GROUP BY Status;",
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s3-2",
+          "title": "Выручка магазинов",
+          "text": "Выведите название магазина и его выручку `Revenue` (тип `DECIMAL(18,2)`) по оплаченным чекам за всё время, от большей к меньшей.",
+          "solution": [
+            "SELECT s.StoreName, CAST(SUM(i.Quantity * i.Price * (1 - i.DiscountPct / 100)) AS DECIMAL(18,2)) AS Revenue",
+            "FROM Orders o",
+            "JOIN Stores s ON s.StoreID = o.StoreID",
+            "JOIN OrderItems i ON i.OrderID = o.OrderID",
+            "WHERE o.Status = N'Оплачен'",
+            "GROUP BY s.StoreName",
+            "ORDER BY Revenue DESC;"
+          ],
+          "check": {
+            "names": true,
+            "order": [
+              [
+                1,
+                "desc"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "s3-3",
+          "title": "Способы оплаты в 2026",
+          "text": "Для оплаченных чеков 2026 года выведите способ оплаты, число чеков `Cnt` и долю способа в процентах `SharePct` (`DECIMAL(5,2)`).",
+          "solution": [
+            "SELECT PaymentType, COUNT(*) AS Cnt,",
+            "       CAST(100.0 * COUNT(*) / (SELECT COUNT(*) FROM Orders WHERE Status = N'Оплачен' AND OrderDate >= '20260101' AND OrderDate < '20270101') AS DECIMAL(5,2)) AS SharePct",
+            "FROM Orders",
+            "WHERE Status = N'Оплачен' AND OrderDate >= '20260101' AND OrderDate < '20270101'",
+            "GROUP BY PaymentType;"
+          ],
+          "hint": "Общее число чеков посчитайте подзапросом или оконной функцией `SUM(COUNT(*)) OVER ()`. Не забудьте `100.0` — иначе деление будет целочисленным.",
+          "check": {
+            "names": true
+          },
+          "alsoOk": [
+            "SELECT PaymentType, COUNT(*) AS Cnt, CAST(100.0 * COUNT(*) / SUM(COUNT(*)) OVER () AS DECIMAL(5,2)) AS SharePct FROM Orders WHERE Status = N'Оплачен' AND OrderDate >= '20260101' AND OrderDate < '20270101' GROUP BY PaymentType;"
+          ]
+        },
+        {
+          "id": "s3-4",
+          "title": "Состав чека",
+          "text": "Выведите состав чека № 100050: наименование товара, количество, цену и сумму строки `LineTotal` с учётом скидки (`DECIMAL(12,2)`).",
+          "solution": [
+            "SELECT p.ProductName, i.Quantity, i.Price,",
+            "       CAST(i.Quantity * i.Price * (1 - i.DiscountPct / 100) AS DECIMAL(12,2)) AS LineTotal",
+            "FROM OrderItems i",
+            "JOIN Products p ON p.ProductID = i.ProductID",
+            "WHERE i.OrderID = 100050;"
+          ],
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s3-5",
+          "title": "Товары в больших категориях",
+          "text": "Для каждой категории **верхнего** уровня выведите её название `TopCategory` и число товаров во всех её подкатегориях `ProductsCnt`.",
+          "solution": [
+            "SELECT top1.CategoryName AS TopCategory, COUNT(*) AS ProductsCnt",
+            "FROM Products p",
+            "JOIN Categories sub ON sub.CategoryID = p.CategoryID",
+            "JOIN Categories top1 ON top1.CategoryID = sub.ParentID",
+            "GROUP BY top1.CategoryName;"
+          ],
+          "hint": "Таблицу Categories нужно присоединить дважды: подкатегория товара и её родитель (`ParentID`).",
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s3-6",
+          "title": "Ни разу не продавались",
+          "text": "Выведите наименования товаров, которых нет ни в одном чеке.",
+          "solution": "SELECT p.ProductName FROM Products p LEFT JOIN OrderItems i ON i.ProductID = p.ProductID WHERE i.OrderItemID IS NULL;",
+          "alsoOk": [
+            "SELECT ProductName FROM Products p WHERE NOT EXISTS (SELECT 1 FROM OrderItems i WHERE i.ProductID = p.ProductID);"
+          ]
+        },
+        {
+          "id": "s3-7",
+          "title": "Кассиры октября",
+          "text": "Выведите ФИО кассира и число оплаченных чеков `Checks`, которые он провёл в октябре 2026 года, по убыванию числа чеков.",
+          "solution": [
+            "SELECT e.FullName, COUNT(*) AS Checks",
+            "FROM Orders o",
+            "JOIN Employees e ON e.EmployeeID = o.EmployeeID",
+            "WHERE o.Status = N'Оплачен' AND o.OrderDate >= '20261001' AND o.OrderDate < '20261101'",
+            "GROUP BY e.EmployeeID, e.FullName",
+            "ORDER BY Checks DESC;"
+          ],
+          "check": {
+            "names": true,
+            "order": [
+              [
+                1,
+                "desc"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "s3-8",
+          "title": "Магазин без продаж",
+          "text": "Выведите название магазина, в котором ещё не было ни одного чека.",
+          "solution": "SELECT s.StoreName FROM Stores s WHERE NOT EXISTS (SELECT 1 FROM Orders o WHERE o.StoreID = s.StoreID);",
+          "alsoOk": [
+            "SELECT s.StoreName FROM Stores s LEFT JOIN Orders o ON o.StoreID = s.StoreID WHERE o.OrderID IS NULL;"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "Аналитика: подзапросы, CTE и окна",
+      "short": "Средний чек, динамика по месяцам, доли, рейтинги внутри групп.",
+      "desc": "Задачи как в реальной отчётности. Сначала считайте промежуточный результат в CTE (`WITH …`), потом стройте отчёт поверх него.",
+      "tasks": [
+        {
+          "id": "s4-1",
+          "title": "Чеки дороже среднего",
+          "text": "Для оплаченных чеков октября 2026 года посчитайте сумму каждого чека и выведите те, что дороже среднего чека за этот месяц: `OrderID`, `Total` (`DECIMAL(12,2)`).",
+          "solution": [
+            "WITH T AS (",
+            "    SELECT o.OrderID, SUM(i.Quantity * i.Price * (1 - i.DiscountPct / 100)) AS Total",
+            "    FROM Orders o JOIN OrderItems i ON i.OrderID = o.OrderID",
+            "    WHERE o.Status = N'Оплачен' AND o.OrderDate >= '20261001' AND o.OrderDate < '20261101'",
+            "    GROUP BY o.OrderID",
+            ")",
+            "SELECT OrderID, CAST(Total AS DECIMAL(12,2)) AS Total",
+            "FROM T",
+            "WHERE Total > (SELECT AVG(Total) FROM T);"
+          ],
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s4-2",
+          "title": "Выручка по месяцам",
+          "text": "Выведите выручку оплаченных чеков 2026 года по месяцам: номер месяца `M` и `Revenue` (`DECIMAL(18,2)`), по порядку месяцев.",
+          "solution": [
+            "SELECT MONTH(o.OrderDate) AS M,",
+            "       CAST(SUM(i.Quantity * i.Price * (1 - i.DiscountPct / 100)) AS DECIMAL(18,2)) AS Revenue",
+            "FROM Orders o JOIN OrderItems i ON i.OrderID = o.OrderID",
+            "WHERE o.Status = N'Оплачен' AND o.OrderDate >= '20260101' AND o.OrderDate < '20270101'",
+            "GROUP BY MONTH(o.OrderDate)",
+            "ORDER BY M;"
+          ],
+          "check": {
+            "names": true,
+            "ordered": true
+          },
+          "alsoOk": [
+            "SELECT DATEPART(month, o.OrderDate) AS M, CAST(SUM(i.Quantity * i.Price * (1 - i.DiscountPct / 100.0)) AS DECIMAL(18,2)) AS Revenue FROM Orders o JOIN OrderItems i ON i.OrderID = o.OrderID WHERE o.Status = N'Оплачен' AND YEAR(o.OrderDate) = 2026 GROUP BY DATEPART(month, o.OrderDate) ORDER BY 1;"
+          ],
+          "wrong": [
+            "SELECT MONTH(o.OrderDate) AS M, CAST(SUM(i.Quantity * i.Price) AS DECIMAL(18,2)) AS Revenue FROM Orders o JOIN OrderItems i ON i.OrderID = o.OrderID WHERE o.Status = N'Оплачен' AND o.OrderDate >= '20260101' GROUP BY MONTH(o.OrderDate) ORDER BY M;"
+          ]
+        },
+        {
+          "id": "s4-3",
+          "title": "Рост к прошлому месяцу",
+          "text": "Продолжите прошлую задачу: к каждому месяцу 2026 года добавьте выручку предыдущего месяца `PrevRevenue` и рост в процентах `GrowthPct` (`DECIMAL(6,2)`). У января предыдущего месяца нет — там будет NULL.",
+          "solution": [
+            "WITH M AS (",
+            "    SELECT MONTH(o.OrderDate) AS M,",
+            "           CAST(SUM(i.Quantity * i.Price * (1 - i.DiscountPct / 100)) AS DECIMAL(18,2)) AS Revenue",
+            "    FROM Orders o JOIN OrderItems i ON i.OrderID = o.OrderID",
+            "    WHERE o.Status = N'Оплачен' AND o.OrderDate >= '20260101' AND o.OrderDate < '20270101'",
+            "    GROUP BY MONTH(o.OrderDate)",
+            ")",
+            "SELECT M, Revenue,",
+            "       LAG(Revenue) OVER (ORDER BY M) AS PrevRevenue,",
+            "       CAST(100.0 * (Revenue - LAG(Revenue) OVER (ORDER BY M)) / LAG(Revenue) OVER (ORDER BY M) AS DECIMAL(6,2)) AS GrowthPct",
+            "FROM M",
+            "ORDER BY M;"
+          ],
+          "hint": "`LAG(Revenue) OVER (ORDER BY M)` возвращает значение из предыдущей строки.",
+          "check": {
+            "names": true,
+            "ordered": true
+          }
+        },
+        {
+          "id": "s4-4",
+          "title": "Доля магазина в выручке",
+          "text": "Для каждого магазина с продажами выведите `StoreName`, выручку `Revenue` по оплаченным чекам и долю в выручке сети `SharePct` (обе — `DECIMAL`, доля — `DECIMAL(5,2)`).",
+          "solution": [
+            "WITH R AS (",
+            "    SELECT s.StoreName, SUM(i.Quantity * i.Price * (1 - i.DiscountPct / 100)) AS Revenue",
+            "    FROM Orders o",
+            "    JOIN Stores s ON s.StoreID = o.StoreID",
+            "    JOIN OrderItems i ON i.OrderID = o.OrderID",
+            "    WHERE o.Status = N'Оплачен'",
+            "    GROUP BY s.StoreName",
+            ")",
+            "SELECT StoreName, CAST(Revenue AS DECIMAL(18,2)) AS Revenue,",
+            "       CAST(100.0 * Revenue / SUM(Revenue) OVER () AS DECIMAL(5,2)) AS SharePct",
+            "FROM R;"
+          ],
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s4-5",
+          "title": "Топ-3 товара в каждой категории",
+          "text": "По выручке оплаченных чеков 2026 года найдите три самых продаваемых товара в каждой категории **верхнего** уровня: `TopCategory`, `ProductName`, `Revenue` (`DECIMAL(18,2)`), `Place` (1–3).",
+          "solution": [
+            "WITH S AS (",
+            "    SELECT top1.CategoryName AS TopCategory, p.ProductName,",
+            "           SUM(i.Quantity * i.Price * (1 - i.DiscountPct / 100)) AS Revenue",
+            "    FROM Orders o",
+            "    JOIN OrderItems i ON i.OrderID = o.OrderID",
+            "    JOIN Products p ON p.ProductID = i.ProductID",
+            "    JOIN Categories sub ON sub.CategoryID = p.CategoryID",
+            "    JOIN Categories top1 ON top1.CategoryID = sub.ParentID",
+            "    WHERE o.Status = N'Оплачен' AND o.OrderDate >= '20260101' AND o.OrderDate < '20270101'",
+            "    GROUP BY top1.CategoryName, p.ProductName",
+            "), R AS (",
+            "    SELECT TopCategory, ProductName, Revenue,",
+            "           ROW_NUMBER() OVER (PARTITION BY TopCategory ORDER BY Revenue DESC) AS Place",
+            "    FROM S",
+            ")",
+            "SELECT TopCategory, ProductName, CAST(Revenue AS DECIMAL(18,2)) AS Revenue, Place",
+            "FROM R",
+            "WHERE Place <= 3;"
+          ],
+          "hint": "Пронумеруйте товары внутри категории `ROW_NUMBER() OVER (PARTITION BY … ORDER BY … DESC)`, а отфильтруйте по номеру во внешнем запросе.",
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s4-6",
+          "title": "Постоянные покупатели",
+          "text": "Выведите покупателей, у которых 10 и больше оплаченных чеков: `CustomerID`, `FullName`, `Visits`, дату первой `FirstVisit` и последней `LastVisit` покупки (дата и время чека).",
+          "solution": [
+            "SELECT c.CustomerID, c.FullName, COUNT(*) AS Visits, MIN(o.OrderDate) AS FirstVisit, MAX(o.OrderDate) AS LastVisit",
+            "FROM Orders o",
+            "JOIN Customers c ON c.CustomerID = o.CustomerID",
+            "WHERE o.Status = N'Оплачен'",
+            "GROUP BY c.CustomerID, c.FullName",
+            "HAVING COUNT(*) >= 10;"
+          ],
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s4-7",
+          "title": "Прибыль по категориям",
+          "text": "По оплаченным чекам 2026 года посчитайте для каждой категории (нижнего уровня) выручку `Revenue`, себестоимость `Cost` (`Quantity * CostPrice`), прибыль `Profit` и маржу `MarginPct` = прибыль / выручка × 100. Все суммы — `DECIMAL(18,2)`, маржа — `DECIMAL(5,2)`. Сортировка — по убыванию прибыли.",
+          "solution": [
+            "WITH X AS (",
+            "    SELECT c.CategoryName,",
+            "           SUM(i.Quantity * i.Price * (1 - i.DiscountPct / 100)) AS Revenue,",
+            "           SUM(i.Quantity * p.CostPrice) AS Cost",
+            "    FROM Orders o",
+            "    JOIN OrderItems i ON i.OrderID = o.OrderID",
+            "    JOIN Products p ON p.ProductID = i.ProductID",
+            "    JOIN Categories c ON c.CategoryID = p.CategoryID",
+            "    WHERE o.Status = N'Оплачен' AND o.OrderDate >= '20260101' AND o.OrderDate < '20270101'",
+            "    GROUP BY c.CategoryName",
+            ")",
+            "SELECT CategoryName,",
+            "       CAST(Revenue AS DECIMAL(18,2)) AS Revenue,",
+            "       CAST(Cost AS DECIMAL(18,2)) AS Cost,",
+            "       CAST(Revenue - Cost AS DECIMAL(18,2)) AS Profit,",
+            "       CAST(100.0 * (Revenue - Cost) / Revenue AS DECIMAL(5,2)) AS MarginPct",
+            "FROM X",
+            "ORDER BY Profit DESC;"
+          ],
+          "check": {
+            "names": true,
+            "order": [
+              [
+                3,
+                "desc"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

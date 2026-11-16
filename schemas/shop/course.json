@@ -1,0 +1,97 @@
+{
+  "modules": [
+    {
+      "id": "m1",
+      "title": "Знакомство с Учебным маркетом",
+      "short": "Как устроены чеки и позиции, как правильно считать выручку.",
+      "goal": "Разберёмся в устройстве базы розничной сети и научимся считать выручку так, как её считает отдел отчётности: с учётом скидок, возвратов и отмен.",
+      "lessons": [
+        {
+          "id": "l1", "title": "Чек и его позиции", "minutes": 10,
+          "steps": [
+            { "t": "text", "title": "Две таблицы для одной покупки",
+              "text": [
+                "Покупка в магазине хранится в **двух** таблицах:",
+                "- `Orders` — «шапка» чека: когда, в каком магазине, кто кассир, как оплатили и в каком статусе чек;",
+                "- `OrderItems` — строки чека: какой товар, сколько, по какой цене и с какой скидкой.",
+                "",
+                "Один чек — много позиций. Связь между ними — столбец `OrderID`. Это как накладная в Excel: шапка сверху и таблица товаров под ней.",
+                "",
+                "> **Совет.** Если в отчёте нужна сумма чека, её всегда считают по позициям: в `Orders` готовой суммы нет."
+              ] },
+            { "t": "example", "title": "Шапки чеков",
+              "text": "Посмотрим на первые чеки. Обратите внимание: у части чеков `CustomerID` пустой — покупатель не предъявил карту.",
+              "sql": "SELECT TOP (5) * FROM Orders ORDER BY OrderID;" },
+            { "t": "example", "title": "Позиции чека",
+              "text": "Теперь — что лежит в чеке № 100050. Название товара берём из `Products` через JOIN.",
+              "sql": ["SELECT i.OrderID, p.ProductName, i.Quantity, i.Price, i.DiscountPct", "FROM OrderItems i", "JOIN Products p ON p.ProductID = i.ProductID", "WHERE i.OrderID = 100050;"] },
+            { "t": "quiz", "id": "q1", "title": "Где цена продажи",
+              "q": "Товар подорожал в январе 2026 года. По какой цене считать выручку за 2025 год?",
+              "options": ["`Products.Price` — это цена товара", "`OrderItems.Price` — цена в момент покупки", "Взять среднее между ними", "Цену из таблицы `Stock`"],
+              "answer": 1,
+              "explain": "`Products.Price` — **текущая** цена: она меняется. В позиции чека записана цена, по которой товар реально продали. Для выручки берём `OrderItems.Price`." },
+            { "t": "task", "id": "t1", "title": "Сумма чека",
+              "text": "Посчитайте сумму чека № 100050 без учёта скидки: `SUM(Quantity * Price)`. Назовите столбец `Total`.",
+              "solution": "SELECT SUM(Quantity * Price) AS Total FROM OrderItems WHERE OrderID = 100050;",
+              "check": { "names": true } }
+          ],
+          "training": [
+            { "t": "quiz", "id": "tq1",
+              "q": "Сколько строк в `OrderItems` приходится на один чек?",
+              "options": ["Ровно одна", "Столько, сколько разных товаров в чеке", "Столько, сколько штук товара купили", "Ни одной — суммы хранятся в Orders"],
+              "answer": 1,
+              "explain": "Каждая строка — один товар чека. Количество штук или килограммов хранится в `Quantity`." },
+            { "t": "task", "id": "tt1", "title": "Позиций в чеке",
+              "text": "Сколько позиций в чеке № 100100? Выведите одно число `Items`.",
+              "solution": "SELECT COUNT(*) AS Items FROM OrderItems WHERE OrderID = 100100;",
+              "check": { "names": true } }
+          ]
+        },
+        {
+          "id": "l2", "title": "Выручка без ошибок", "minutes": 12,
+          "steps": [
+            { "t": "text", "title": "Три ловушки",
+              "text": [
+                "Чтобы выручка в отчёте совпала с бухгалтерией, учтите три вещи:",
+                "1. **Статус чека.** Возвраты и отменённые чеки в выручку не входят: `WHERE o.Status = N'Оплачен'`.",
+                "2. **Скидка.** Покупатели с картой получают скидку: `Quantity * Price * (1 - DiscountPct / 100)`.",
+                "3. **Период.** `OrderDate` хранит дату **и время**, поэтому месяц задаём диапазоном.",
+                "",
+                "! Итоговая формула: `SUM(i.Quantity * i.Price * (1 - i.DiscountPct / 100))` по оплаченным чекам за период."
+              ] },
+            { "t": "widget", "title": "Порядок выполнения запроса", "w": "execOrder",
+              "text": "Напоминание: WHERE отбирает строки **до** группировки — поэтому фильтр по статусу срабатывает раньше, чем SUM." },
+            { "t": "example", "title": "Сколько «теряется» на возвратах",
+              "text": "Сравните суммы по статусам — без фильтра выручка была бы завышена.",
+              "sql": ["SELECT o.Status,", "       CAST(SUM(i.Quantity * i.Price * (1 - i.DiscountPct / 100)) AS DECIMAL(18,2)) AS Amount", "FROM Orders o", "JOIN OrderItems i ON i.OrderID = o.OrderID", "GROUP BY o.Status;"] },
+            { "t": "task", "id": "t2", "title": "Выручка октября",
+              "text": "Посчитайте выручку сети за октябрь 2026 года по правилам выше. Столбец — `Revenue`, тип `DECIMAL(18,2)`.",
+              "solution": ["SELECT CAST(SUM(i.Quantity * i.Price * (1 - i.DiscountPct / 100)) AS DECIMAL(18,2)) AS Revenue", "FROM Orders o", "JOIN OrderItems i ON i.OrderID = o.OrderID", "WHERE o.Status = N'Оплачен' AND o.OrderDate >= '20261001' AND o.OrderDate < '20261101';"],
+              "wrong": ["SELECT CAST(SUM(i.Quantity * i.Price) AS DECIMAL(18,2)) AS Revenue FROM Orders o JOIN OrderItems i ON i.OrderID = o.OrderID WHERE o.Status = N'Оплачен' AND o.OrderDate >= '20261001' AND o.OrderDate < '20261101';"],
+              "check": { "names": true } }
+          ],
+          "training": [
+            { "t": "order", "id": "to1",
+              "q": "Расставьте шаги расчёта выручки за месяц в правильном порядке:",
+              "items": ["Соединить Orders и OrderItems по OrderID", "Оставить только оплаченные чеки нужного месяца", "Посчитать сумму строки с учётом скидки", "Сложить суммы строк (SUM)"],
+              "explain": "Сначала соединяем и фильтруем строки, затем считаем и суммируем." },
+            { "t": "task", "id": "tt2", "title": "Сумма скидок",
+              "text": "Сколько сом скидок получили покупатели за 2026 год по оплаченным чекам? Скидка строки = `Quantity * Price * DiscountPct / 100`. Столбец — `Discounts`, тип `DECIMAL(18,2)`.",
+              "solution": "SELECT CAST(SUM(i.Quantity * i.Price * i.DiscountPct / 100) AS DECIMAL(18,2)) AS Discounts FROM Orders o JOIN OrderItems i ON i.OrderID = o.OrderID WHERE o.Status = N'Оплачен' AND o.OrderDate >= '20260101' AND o.OrderDate < '20270101';",
+              "check": { "names": true } }
+          ]
+        }
+      ],
+      "homework": [
+        { "id": "hw1", "title": "Выручка магазинов за квартал",
+          "text": "Выведите выручку каждого магазина за III квартал 2026 года (июль–сентябрь): `StoreName`, `Revenue` (`DECIMAL(18,2)`), по убыванию выручки.",
+          "solution": ["SELECT s.StoreName, CAST(SUM(i.Quantity * i.Price * (1 - i.DiscountPct / 100)) AS DECIMAL(18,2)) AS Revenue", "FROM Orders o", "JOIN Stores s ON s.StoreID = o.StoreID", "JOIN OrderItems i ON i.OrderID = o.OrderID", "WHERE o.Status = N'Оплачен' AND o.OrderDate >= '20260701' AND o.OrderDate < '20261001'", "GROUP BY s.StoreName", "ORDER BY Revenue DESC;"],
+          "check": { "names": true, "order": [[1, "desc"]] } },
+        { "id": "hw2", "title": "Возвраты по товарам",
+          "text": "Какие товары возвращали чаще всего? Выведите `ProductName` и число чеков со статусом «Возврат», где был этот товар (`Returns`). Только товары с 3 и более возвратами, по убыванию.",
+          "solution": ["SELECT p.ProductName, COUNT(*) AS Returns", "FROM Orders o", "JOIN OrderItems i ON i.OrderID = o.OrderID", "JOIN Products p ON p.ProductID = i.ProductID", "WHERE o.Status = N'Возврат'", "GROUP BY p.ProductName", "HAVING COUNT(*) >= 3", "ORDER BY Returns DESC;"],
+          "check": { "names": true, "order": [[1, "desc"]] } }
+      ]
+    }
+  ]
+}

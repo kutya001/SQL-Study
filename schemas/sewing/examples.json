@@ -1,0 +1,23 @@
+{
+  "examples": [
+    { "title": "Ассортиментные группы и число моделей",
+      "sql": ["SELECT g.GroupID, g.GroupName, g.Season, COUNT(p.ProductID) AS Models", "FROM ProductGroups g", "LEFT JOIN Products p ON p.GroupID = g.GroupID", "GROUP BY g.GroupID, g.GroupName, g.Season", "ORDER BY g.GroupID;"] },
+    { "title": "Выпуск за последний рабочий день",
+      "sql": ["SELECT l.ProducedAt, w.WorkshopName, e.FullName, p.Article, l.QtyMade, l.QtyDefect", "FROM ProductionLog l", "JOIN Workshops w ON w.WorkshopID = l.WorkshopID", "JOIN Employees e ON e.EmployeeID = l.EmployeeID", "JOIN Products p ON p.ProductID = l.ProductID", "WHERE l.ProducedAt >= '20261030' AND l.ProducedAt < '20261031'", "ORDER BY l.ProducedAt;"] },
+    { "title": "Заказ и его строки",
+      "sql": ["SELECT o.OrderID, c.CustomerName, o.OrderDate, o.DueDate, o.ShipDate, o.Status,", "       p.Article, p.ProductName, ol.Qty, ol.Price", "FROM Orders o", "JOIN Customers c ON c.CustomerID = o.CustomerID", "JOIN OrderLines ol ON ol.OrderID = o.OrderID", "JOIN Products p ON p.ProductID = ol.ProductID", "WHERE o.OrderID = 25100;"] },
+    { "title": "Выпуск и брак по группам",
+      "sql": ["SELECT g.GroupName, SUM(l.QtyMade) AS Made, SUM(l.QtyDefect) AS Defect,", "       CAST(SUM(l.QtyDefect) * 100.0 / SUM(l.QtyMade) AS DECIMAL(5,2)) AS DefectPct, g.PlanDefectPct", "FROM ProductionLog l", "JOIN Products p ON p.ProductID = l.ProductID", "JOIN ProductGroups g ON g.GroupID = p.GroupID", "GROUP BY g.GroupName, g.PlanDefectPct", "ORDER BY DefectPct DESC;"] },
+    { "title": "Отгрузки по месяцам",
+      "sql": ["SELECT FORMAT(o.ShipDate, 'yyyy-MM') AS Mon, COUNT(DISTINCT o.OrderID) AS Orders, SUM(ol.Qty) AS Qty,", "       CAST(SUM(ol.Qty * ol.Price * (1 - o.DiscountPct / 100)) AS DECIMAL(18,2)) AS Revenue", "FROM Orders o", "JOIN OrderLines ol ON ol.OrderID = o.OrderID", "WHERE o.Status = N'Отгружен'", "GROUP BY FORMAT(o.ShipDate, 'yyyy-MM')", "ORDER BY Mon;"] },
+    { "title": "Кто кому подчиняется",
+      "sql": ["SELECT e.FullName AS Employee, e.Position, m.FullName AS Manager, m.Position AS ManagerPosition", "FROM Employees e", "LEFT JOIN Employees m ON m.EmployeeID = e.ManagerID", "ORDER BY m.FullName, e.FullName;"] },
+    { "title": "Просроченные заказы на сегодня",
+      "sql": ["-- «Сегодня» в этой базе — 31.10.2026", "SELECT o.OrderID, c.CustomerName, o.DueDate, DATEDIFF(day, o.DueDate, GETDATE()) AS OverdueDays", "FROM Orders o", "JOIN Customers c ON c.CustomerID = o.CustomerID", "WHERE o.ShipDate IS NULL AND o.Status IN (N'Новый', N'В работе') AND o.DueDate < CAST(GETDATE() AS DATE)", "ORDER BY OverdueDays DESC;"] },
+    { "title": "Две базы: сотрудники — клиенты банка",
+      "sql": ["-- Таблица другой базы: ИмяБазы.dbo.Таблица", "SELECT e.FullName, e.Position, e.Phone, b.ClientID AS BankClientID", "FROM Sewing.dbo.Employees e", "JOIN Bank.dbo.Clients b ON b.Phone = e.Phone", "ORDER BY e.FullName;"] },
+    { "title": "USE: переключение базы",
+      "sql": ["USE Bank;", "SELECT DB_NAME() AS CurrentDb, COUNT(*) AS Clients FROM Clients;"],
+      "note": "После выполнения песочница переключится на базу Bank — как в SSMS." }
+  ]
+}

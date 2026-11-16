@@ -1,0 +1,123 @@
+{
+  "id": "sewing",
+  "title": "Швейная фабрика",
+  "icon": "🧵",
+  "dbName": "Sewing",
+  "version": "1.0",
+  "author": "Курс «SELECT с нуля»",
+  "order": 20,
+  "today": "2026-10-31",
+  "description": [
+    "Вымышленная швейная фабрика: 10 ассортиментных групп (от футболок до спецодежды), модели с нормами времени и ценами, цеха и сотрудники, заказы оптовых покупателей из Кыргызстана, Казахстана и России, журнал выпуска с браком. Данные — с января 2025 по октябрь 2026. «Сегодня» в этой базе — 31.10.2026: `GETDATE()` возвращает эту дату.",
+    "",
+    "> **Как считать.** Годные изделия = `QtyMade - QtyDefect`. Процент брака = `QtyDefect * 100.0 / QtyMade`. Нормо-часы = `QtyMade * NormMinutes / 60`. Выручка = `Qty * Price * (1 - DiscountPct / 100)` по строкам заказов со статусом «Отгружен» (период — по `ShipDate`). Плановая себестоимость = `Qty * CostPrice`.",
+    "",
+    "Заказ просрочен, если `ShipDate > DueDate`, или он ещё не отгружен (`ShipDate IS NULL`), не отменён, а срок уже прошёл. Часть сотрудников — клиенты базы **Bank** по зарплатному проекту (совпадают ФИО и телефон)."
+  ],
+  "tables": [
+    {
+      "name": "ProductGroups", "title": "Ассортиментные группы",
+      "columns": [
+        { "name": "GroupID", "type": "int", "pk": true, "desc": "Код группы (1–10)" },
+        { "name": "GroupName", "type": "nvarchar(50)", "desc": "Название группы" },
+        { "name": "Season", "type": "nvarchar(20)", "desc": "Сезон: Весна-лето, Осень-зима, Всесезон" },
+        { "name": "PlanDefectPct", "type": "decimal(4,2)", "desc": "Допустимый процент брака по нормативу" }
+      ]
+    },
+    {
+      "name": "Products", "title": "Модели (артикулы)",
+      "columns": [
+        { "name": "ProductID", "type": "int", "pk": true, "desc": "Код модели" },
+        { "name": "Article", "type": "varchar(10)", "desc": "Артикул: префикс группы и номер, например FT-101" },
+        { "name": "ProductName", "type": "nvarchar(100)", "desc": "Название модели" },
+        { "name": "GroupID", "type": "int", "fk": "ProductGroups.GroupID", "desc": "Ассортиментная группа" },
+        { "name": "Fabric", "type": "nvarchar(30)", "desc": "Основная ткань" },
+        { "name": "SizeRange", "type": "varchar(10)", "desc": "Размерный ряд, например 42-56 или 122-176" },
+        { "name": "NormMinutes", "type": "decimal(6,1)", "desc": "Норма времени на пошив одного изделия, мин" },
+        { "name": "CostPrice", "type": "decimal(12,2)", "desc": "Плановая себестоимость изделия, сом" },
+        { "name": "WholesalePrice", "type": "decimal(12,2)", "desc": "Текущая оптовая цена, сом" },
+        { "name": "IsActive", "type": "bit", "desc": "1 — модель в производстве, 0 — снята" },
+        { "name": "LaunchDate", "type": "date", "desc": "Дата запуска модели" }
+      ]
+    },
+    {
+      "name": "Workshops", "title": "Цеха",
+      "columns": [
+        { "name": "WorkshopID", "type": "int", "pk": true, "desc": "Код цеха" },
+        { "name": "WorkshopName", "type": "nvarchar(50)", "desc": "Название" },
+        { "name": "Kind", "type": "nvarchar(20)", "desc": "Вид работ: Раскрой, Пошив, ВТО и упаковка" },
+        { "name": "City", "type": "nvarchar(30)", "desc": "Город" },
+        { "name": "LinesCount", "type": "int", "desc": "Число производственных линий" },
+        { "name": "OpenDate", "type": "date", "desc": "Дата открытия" }
+      ]
+    },
+    {
+      "name": "Employees", "title": "Сотрудники",
+      "columns": [
+        { "name": "EmployeeID", "type": "int", "pk": true, "desc": "Код сотрудника" },
+        { "name": "FullName", "type": "nvarchar(100)", "desc": "Фамилия и имя" },
+        { "name": "WorkshopID", "type": "int", "fk": "Workshops.WorkshopID", "desc": "Цех (NULL — администрация)" },
+        { "name": "Position", "type": "nvarchar(30)", "desc": "Должность" },
+        { "name": "Grade", "type": "int", "desc": "Разряд 2–6 (NULL — у руководителей и ОТК)" },
+        { "name": "HireDate", "type": "date", "desc": "Дата приёма" },
+        { "name": "FireDate", "type": "date", "desc": "Дата увольнения (NULL — работает)" },
+        { "name": "Salary", "type": "decimal(12,2)", "desc": "Оклад, сом в месяц" },
+        { "name": "Phone", "type": "varchar(20)", "desc": "Телефон +996… (может быть NULL)" },
+        { "name": "ManagerID", "type": "int", "fk": "Employees.EmployeeID", "desc": "Непосредственный руководитель (NULL — директор производства)" }
+      ]
+    },
+    {
+      "name": "Customers", "title": "Заказчики (оптовые покупатели)",
+      "columns": [
+        { "name": "CustomerID", "type": "int", "pk": true, "desc": "Код заказчика" },
+        { "name": "CustomerName", "type": "nvarchar(100)", "desc": "Название" },
+        { "name": "CustomerType", "type": "nvarchar(20)", "desc": "Тип: Розничная сеть, Оптовик, Маркетплейс, Экспорт, Госзаказ, Корпоративный" },
+        { "name": "Country", "type": "nvarchar(20)", "desc": "Страна" },
+        { "name": "City", "type": "nvarchar(30)", "desc": "Город" },
+        { "name": "Phone", "type": "varchar(20)", "desc": "Телефон (может быть NULL)" },
+        { "name": "ContractDate", "type": "date", "desc": "Дата договора" }
+      ]
+    },
+    {
+      "name": "Orders", "title": "Заказы",
+      "columns": [
+        { "name": "OrderID", "type": "int", "pk": true, "desc": "Номер заказа" },
+        { "name": "OrderDate", "type": "date", "desc": "Дата заказа" },
+        { "name": "CustomerID", "type": "int", "fk": "Customers.CustomerID", "desc": "Заказчик" },
+        { "name": "DueDate", "type": "date", "desc": "Срок отгрузки по договору" },
+        { "name": "ShipDate", "type": "date", "desc": "Фактическая дата отгрузки (NULL — ещё не отгружен)" },
+        { "name": "Status", "type": "nvarchar(20)", "desc": "Статус: Новый, В работе, Отгружен, Отменён" },
+        { "name": "DiscountPct", "type": "decimal(5,2)", "desc": "Скидка на заказ, %" }
+      ]
+    },
+    {
+      "name": "OrderLines", "title": "Строки заказов",
+      "columns": [
+        { "name": "OrderLineID", "type": "int", "pk": true, "desc": "Код строки" },
+        { "name": "OrderID", "type": "int", "fk": "Orders.OrderID", "desc": "Заказ" },
+        { "name": "ProductID", "type": "int", "fk": "Products.ProductID", "desc": "Модель" },
+        { "name": "Qty", "type": "int", "desc": "Заказано, шт" },
+        { "name": "Price", "type": "decimal(12,2)", "desc": "Цена за штуку в заказе, сом" }
+      ]
+    },
+    {
+      "name": "ProductionLog", "title": "Журнал выпуска (партии, сданные в ОТК)",
+      "columns": [
+        { "name": "LogID", "type": "int", "pk": true, "desc": "Код записи" },
+        { "name": "ProducedAt", "type": "datetime", "desc": "Дата и время сдачи партии" },
+        { "name": "WorkshopID", "type": "int", "fk": "Workshops.WorkshopID", "desc": "Цех" },
+        { "name": "EmployeeID", "type": "int", "fk": "Employees.EmployeeID", "desc": "Швея" },
+        { "name": "ProductID", "type": "int", "fk": "Products.ProductID", "desc": "Модель" },
+        { "name": "OrderLineID", "type": "int", "fk": "OrderLines.OrderLineID", "desc": "Строка заказа (NULL — пошив на склад)" },
+        { "name": "Shift", "type": "nvarchar(10)", "desc": "Смена: Дневная или Вечерняя" },
+        { "name": "QtyMade", "type": "int", "desc": "Пошито изделий в партии" },
+        { "name": "QtyDefect", "type": "int", "desc": "Из них забраковано ОТК" }
+      ]
+    }
+  ],
+  "layout": {
+    "ProductGroups": [0, 0], "Products": [1, 0], "Customers": [2, 0],
+    "Workshops": [0, 1], "ProductionLog": [1, 1], "Orders": [2, 1],
+    "Employees": [0, 2], "OrderLines": [2, 2]
+  }
+}

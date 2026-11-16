@@ -1,0 +1,8 @@
+# Прогресс учеников — личные данные, в репозиторий не попадает
+progress/*.json
+# Служебное
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+/tmp/

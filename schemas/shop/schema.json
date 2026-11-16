@@ -1,0 +1,114 @@
+{
+  "id": "shop",
+  "title": "Учебный маркет",
+  "icon": "🛒",
+  "dbName": "Shop",
+  "version": "1.0",
+  "author": "Курс «SELECT с нуля»",
+  "order": 10,
+  "description": [
+    "Вымышленная сеть продуктовых магазинов: магазины, товары и категории, покупатели с картами лояльности, сотрудники, чеки с позициями и остатки на складе. Продажи — с января 2025 по октябрь 2026.",
+    "",
+    "> **Как считать выручку.** `Quantity * Price * (1 - DiscountPct / 100)` по позициям чеков со статусом «Оплачен». Себестоимость — `Quantity * CostPrice`, прибыль — выручка минус себестоимость.",
+    "",
+    "Часть покупателей — клиенты базы **Bank** (совпадают ФИО и телефон): можно потренироваться в запросах сразу к двум базам."
+  ],
+  "tables": [
+    {
+      "name": "Stores", "title": "Магазины сети",
+      "columns": [
+        { "name": "StoreID", "type": "int", "pk": true, "desc": "Код магазина" },
+        { "name": "StoreName", "type": "nvarchar(100)", "desc": "Название" },
+        { "name": "City", "type": "nvarchar(50)", "desc": "Город" },
+        { "name": "Address", "type": "nvarchar(200)", "desc": "Адрес" },
+        { "name": "OpenDate", "type": "date", "desc": "Дата открытия" },
+        { "name": "AreaSqm", "type": "int", "desc": "Площадь торгового зала, м²" },
+        { "name": "Format", "type": "nvarchar(20)", "desc": "Формат: Гипермаркет, Супермаркет, У дома" }
+      ]
+    },
+    {
+      "name": "Categories", "title": "Категории товаров (два уровня)",
+      "columns": [
+        { "name": "CategoryID", "type": "int", "pk": true, "desc": "Код категории" },
+        { "name": "CategoryName", "type": "nvarchar(100)", "desc": "Название" },
+        { "name": "ParentID", "type": "int", "fk": "Categories.CategoryID", "desc": "Родительская категория (NULL — категория верхнего уровня)" }
+      ]
+    },
+    {
+      "name": "Products", "title": "Товары",
+      "columns": [
+        { "name": "ProductID", "type": "int", "pk": true, "desc": "Код товара" },
+        { "name": "ProductName", "type": "nvarchar(150)", "desc": "Наименование" },
+        { "name": "CategoryID", "type": "int", "fk": "Categories.CategoryID", "desc": "Категория (нижнего уровня)" },
+        { "name": "Brand", "type": "nvarchar(50)", "desc": "Бренд (NULL — без бренда, весовой товар)" },
+        { "name": "Unit", "type": "nvarchar(10)", "desc": "Единица: шт или кг" },
+        { "name": "Price", "type": "decimal(12,2)", "desc": "Текущая розничная цена, сом" },
+        { "name": "CostPrice", "type": "decimal(12,2)", "desc": "Закупочная цена (себестоимость), сом" },
+        { "name": "IsActive", "type": "bit", "desc": "1 — в продаже, 0 — выведен из ассортимента" },
+        { "name": "AddedDate", "type": "date", "desc": "Дата добавления в ассортимент" }
+      ]
+    },
+    {
+      "name": "Customers", "title": "Покупатели",
+      "columns": [
+        { "name": "CustomerID", "type": "int", "pk": true, "desc": "Код покупателя" },
+        { "name": "FullName", "type": "nvarchar(150)", "desc": "Фамилия и имя" },
+        { "name": "Gender", "type": "nchar(1)", "desc": "Пол: М или Ж" },
+        { "name": "BirthDate", "type": "date", "desc": "Дата рождения (может быть NULL)" },
+        { "name": "Phone", "type": "varchar(20)", "desc": "Телефон в формате +996… (может быть NULL)" },
+        { "name": "City", "type": "nvarchar(50)", "desc": "Город" },
+        { "name": "CardNumber", "type": "varchar(16)", "desc": "Номер карты лояльности (NULL — карты нет)" },
+        { "name": "RegDate", "type": "date", "desc": "Дата регистрации" }
+      ]
+    },
+    {
+      "name": "Employees", "title": "Сотрудники",
+      "columns": [
+        { "name": "EmployeeID", "type": "int", "pk": true, "desc": "Код сотрудника" },
+        { "name": "FullName", "type": "nvarchar(150)", "desc": "ФИО" },
+        { "name": "StoreID", "type": "int", "fk": "Stores.StoreID", "desc": "Магазин (NULL — офис сети)" },
+        { "name": "Position", "type": "nvarchar(50)", "desc": "Должность" },
+        { "name": "HireDate", "type": "date", "desc": "Дата приёма" },
+        { "name": "Salary", "type": "decimal(12,2)", "desc": "Оклад, сом" },
+        { "name": "ManagerID", "type": "int", "fk": "Employees.EmployeeID", "desc": "Руководитель (NULL — управляющий сетью)" }
+      ]
+    },
+    {
+      "name": "Orders", "title": "Чеки (покупки)",
+      "columns": [
+        { "name": "OrderID", "type": "int", "pk": true, "desc": "Номер чека" },
+        { "name": "OrderDate", "type": "datetime", "desc": "Дата и время покупки" },
+        { "name": "StoreID", "type": "int", "fk": "Stores.StoreID", "desc": "Магазин" },
+        { "name": "CustomerID", "type": "int", "fk": "Customers.CustomerID", "desc": "Покупатель (NULL — покупка без карты)" },
+        { "name": "EmployeeID", "type": "int", "fk": "Employees.EmployeeID", "desc": "Кассир" },
+        { "name": "PaymentType", "type": "nvarchar(20)", "desc": "Оплата: Наличные, Карта, QR-оплата" },
+        { "name": "Status", "type": "nvarchar(20)", "desc": "Статус: Оплачен, Возврат, Отменён" }
+      ]
+    },
+    {
+      "name": "OrderItems", "title": "Позиции чеков",
+      "columns": [
+        { "name": "OrderItemID", "type": "int", "pk": true, "desc": "Код позиции" },
+        { "name": "OrderID", "type": "int", "fk": "Orders.OrderID", "desc": "Чек" },
+        { "name": "ProductID", "type": "int", "fk": "Products.ProductID", "desc": "Товар" },
+        { "name": "Quantity", "type": "decimal(10,3)", "desc": "Количество (шт или кг)" },
+        { "name": "Price", "type": "decimal(12,2)", "desc": "Цена за единицу на момент покупки" },
+        { "name": "DiscountPct", "type": "decimal(5,2)", "desc": "Скидка по карте, %" }
+      ]
+    },
+    {
+      "name": "Stock", "title": "Остатки товаров в магазинах на 31.10.2026",
+      "columns": [
+        { "name": "StoreID", "type": "int", "fk": "Stores.StoreID", "desc": "Магазин" },
+        { "name": "ProductID", "type": "int", "fk": "Products.ProductID", "desc": "Товар" },
+        { "name": "Quantity", "type": "decimal(12,3)", "desc": "Остаток (шт или кг)" },
+        { "name": "UpdatedAt", "type": "datetime", "desc": "Время последнего пересчёта" }
+      ]
+    }
+  ],
+  "layout": {
+    "Categories": [0, 0], "Products": [1, 0], "Stock": [2, 0],
+    "Customers": [0, 1], "OrderItems": [1, 1], "Stores": [2, 1],
+    "Orders": [1, 2], "Employees": [2, 2]
+  }
+}

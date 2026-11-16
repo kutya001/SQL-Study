@@ -1,0 +1,121 @@
+{
+  "id": "cargo",
+  "title": "Карго по СНГ",
+  "icon": "📦",
+  "dbName": "Cargo",
+  "version": "1.0",
+  "author": "Курс «SELECT с нуля»",
+  "order": 30,
+  "today": "2026-10-31",
+  "description": [
+    "Вымышленная карго-компания: доставляет посылки и сборные грузы между Кыргызстаном, Казахстаном, Россией, Узбекистаном, Таджикистаном и Беларусью. Хабы, склады и пункты выдачи, тарифы, рейсы (авто и авиа), отправления с трек-номерами и претензии клиентов. Данные — с января 2025 по октябрь 2026. «Сегодня» в этой базе — 31.10.2026: `GETDATE()` возвращает эту дату.",
+    "",
+    "> **Как считать.** Стоимость доставки `Cost` = большее из `WeightKg * PricePerKg` и `MinPrice` тарифа. Выручка = сумма `Cost` по отправлениям, кроме отменённых (период — по `CreatedAt`). Страховой сбор = 1% от объявленной ценности `DeclaredValue` (если она указана). Срок доставки = дни от приёма (`Shipments.CreatedAt`) до прибытия рейса (`Trips.ArriveAt`); доставлено в срок, если он не больше `DaysNorm` тарифа.",
+    "",
+    "Пункты выдачи подчинены складам и хабам (`ParentID`), рейсы ходят между хабами и складами. Посылка лежит бесплатно `FreeStorageDays` дней после прибытия рейса. Часть клиентов — клиенты базы **Bank** (совпадают ФИО и телефон)."
+  ],
+  "tables": [
+    {
+      "name": "Warehouses", "title": "Хабы, склады и пункты выдачи",
+      "columns": [
+        { "name": "WarehouseID", "type": "int", "pk": true, "desc": "Код точки" },
+        { "name": "WarehouseName", "type": "nvarchar(60)", "desc": "Название" },
+        { "name": "City", "type": "nvarchar(30)", "desc": "Город" },
+        { "name": "Country", "type": "nvarchar(20)", "desc": "Страна" },
+        { "name": "Kind", "type": "nvarchar(20)", "desc": "Вид: Хаб, Склад, Пункт выдачи" },
+        { "name": "ParentID", "type": "int", "fk": "Warehouses.WarehouseID", "desc": "Вышестоящий склад или хаб (NULL — у хабов)" },
+        { "name": "OpenDate", "type": "date", "desc": "Дата открытия" },
+        { "name": "FreeStorageDays", "type": "int", "desc": "Бесплатное хранение посылки, дней" }
+      ]
+    },
+    {
+      "name": "Employees", "title": "Сотрудники",
+      "columns": [
+        { "name": "EmployeeID", "type": "int", "pk": true, "desc": "Код сотрудника" },
+        { "name": "FullName", "type": "nvarchar(100)", "desc": "Фамилия и имя" },
+        { "name": "WarehouseID", "type": "int", "fk": "Warehouses.WarehouseID", "desc": "Место работы (NULL — головной офис)" },
+        { "name": "Position", "type": "nvarchar(40)", "desc": "Должность" },
+        { "name": "HireDate", "type": "date", "desc": "Дата приёма" },
+        { "name": "FireDate", "type": "date", "desc": "Дата увольнения (NULL — работает)" },
+        { "name": "Phone", "type": "varchar(20)", "desc": "Телефон (может быть NULL)" },
+        { "name": "ManagerID", "type": "int", "fk": "Employees.EmployeeID", "desc": "Руководитель (NULL — директор по логистике)" }
+      ]
+    },
+    {
+      "name": "Customers", "title": "Клиенты-отправители",
+      "columns": [
+        { "name": "CustomerID", "type": "int", "pk": true, "desc": "Код клиента" },
+        { "name": "CustomerName", "type": "nvarchar(100)", "desc": "Имя или название" },
+        { "name": "ClientType", "type": "nvarchar(20)", "desc": "Тип: Физлицо, ИП, Компания" },
+        { "name": "Country", "type": "nvarchar(20)", "desc": "Страна" },
+        { "name": "City", "type": "nvarchar(30)", "desc": "Город" },
+        { "name": "Phone", "type": "varchar(20)", "desc": "Телефон (может быть NULL)" },
+        { "name": "Email", "type": "varchar(60)", "desc": "Электронная почта (может быть NULL)" },
+        { "name": "RegDate", "type": "date", "desc": "Дата регистрации" }
+      ]
+    },
+    {
+      "name": "Tariffs", "title": "Тарифы",
+      "columns": [
+        { "name": "TariffID", "type": "int", "pk": true, "desc": "Код тарифа" },
+        { "name": "TariffName", "type": "nvarchar(50)", "desc": "Название" },
+        { "name": "Transport", "type": "nvarchar(10)", "desc": "Вид транспорта: Авто, Авиа, Ж/д" },
+        { "name": "PricePerKg", "type": "decimal(8,2)", "desc": "Цена за килограмм, сом" },
+        { "name": "MinPrice", "type": "decimal(10,2)", "desc": "Минимальная стоимость отправления, сом" },
+        { "name": "DaysNorm", "type": "int", "desc": "Нормативный срок доставки, дней" },
+        { "name": "IsActive", "type": "bit", "desc": "1 — действует, 0 — архивный" }
+      ]
+    },
+    {
+      "name": "Trips", "title": "Рейсы",
+      "columns": [
+        { "name": "TripID", "type": "int", "pk": true, "desc": "Код рейса" },
+        { "name": "TripNo", "type": "varchar(16)", "desc": "Номер рейса: коды складов и порядковый номер, A — авиа" },
+        { "name": "FromWarehouseID", "type": "int", "fk": "Warehouses.WarehouseID", "desc": "Откуда" },
+        { "name": "ToWarehouseID", "type": "int", "fk": "Warehouses.WarehouseID", "desc": "Куда" },
+        { "name": "Transport", "type": "nvarchar(10)", "desc": "Авто или Авиа" },
+        { "name": "DriverID", "type": "int", "fk": "Employees.EmployeeID", "desc": "Водитель (NULL — авиарейс)" },
+        { "name": "DepartAt", "type": "datetime", "desc": "Отправление (план или факт)" },
+        { "name": "ArriveAt", "type": "datetime", "desc": "Фактическое прибытие (NULL — ещё не прибыл)" },
+        { "name": "Status", "type": "nvarchar(20)", "desc": "Статус: Запланирован, В пути, Прибыл, Отменён" }
+      ]
+    },
+    {
+      "name": "Shipments", "title": "Отправления (посылки и грузы)",
+      "columns": [
+        { "name": "ShipmentID", "type": "int", "pk": true, "desc": "Код отправления" },
+        { "name": "TrackNo", "type": "varchar(12)", "desc": "Трек-номер" },
+        { "name": "CustomerID", "type": "int", "fk": "Customers.CustomerID", "desc": "Отправитель" },
+        { "name": "ReceiverName", "type": "nvarchar(100)", "desc": "Получатель" },
+        { "name": "ReceiverPhone", "type": "varchar(20)", "desc": "Телефон получателя (может быть NULL)" },
+        { "name": "FromWarehouseID", "type": "int", "fk": "Warehouses.WarehouseID", "desc": "Где принято" },
+        { "name": "ToWarehouseID", "type": "int", "fk": "Warehouses.WarehouseID", "desc": "Куда доставить" },
+        { "name": "TariffID", "type": "int", "fk": "Tariffs.TariffID", "desc": "Тариф" },
+        { "name": "TripID", "type": "int", "fk": "Trips.TripID", "desc": "Рейс (NULL — ещё не назначен или отменено)" },
+        { "name": "AcceptedBy", "type": "int", "fk": "Employees.EmployeeID", "desc": "Сотрудник, принявший отправление" },
+        { "name": "CreatedAt", "type": "datetime", "desc": "Дата и время приёма" },
+        { "name": "WeightKg", "type": "decimal(8,2)", "desc": "Вес, кг" },
+        { "name": "DeclaredValue", "type": "decimal(12,2)", "desc": "Объявленная ценность, сом (NULL — не объявлена)" },
+        { "name": "Cost", "type": "decimal(10,2)", "desc": "Стоимость доставки, сом" },
+        { "name": "Status", "type": "nvarchar(20)", "desc": "Статус: Принят, В пути, Прибыл, Выдан, Возврат, Утерян, Отменён" },
+        { "name": "DeliveredAt", "type": "datetime", "desc": "Когда выдано получателю (NULL — ещё не выдано)" }
+      ]
+    },
+    {
+      "name": "Claims", "title": "Претензии клиентов",
+      "columns": [
+        { "name": "ClaimID", "type": "int", "pk": true, "desc": "Код претензии" },
+        { "name": "ShipmentID", "type": "int", "fk": "Shipments.ShipmentID", "desc": "Отправление" },
+        { "name": "ClaimDate", "type": "date", "desc": "Дата подачи" },
+        { "name": "Reason", "type": "nvarchar(20)", "desc": "Причина: Повреждение, Утеря, Задержка" },
+        { "name": "Status", "type": "nvarchar(20)", "desc": "Статус: На рассмотрении, Удовлетворена, Отклонена" },
+        { "name": "Amount", "type": "decimal(12,2)", "desc": "Выплачено, сом (NULL — не выплачивалось)" }
+      ]
+    }
+  ],
+  "layout": {
+    "Warehouses": [0, 0], "Trips": [1, 0], "Tariffs": [2, 0],
+    "Employees": [0, 1], "Shipments": [1, 1], "Customers": [2, 1],
+    "Claims": [1, 2]
+  }
+}

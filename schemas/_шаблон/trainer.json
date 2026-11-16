@@ -1,0 +1,16 @@
+{
+  "tasks": [
+    { "id": "tr1", "level": 1, "title": "Толстые книги", "tags": ["WHERE"],
+      "text": "Выведите названия книг больше 400 страниц.",
+      "solution": "SELECT Title FROM Books WHERE Pages > 400;" },
+    { "id": "tr2", "level": 3, "title": "Книг у автора", "tags": ["JOIN", "GROUP BY"],
+      "text": "Для каждого автора выведите имя `FullName` и число его книг `Books`, включая авторов без книг.",
+      "solution": [
+        "SELECT a.FullName, COUNT(b.BookID) AS Books",
+        "FROM Authors a",
+        "LEFT JOIN Books b ON b.AuthorID = a.AuthorID",
+        "GROUP BY a.AuthorID, a.FullName;"
+      ],
+      "check": { "names": true } }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "examples": [
+    { "title": "Книги с авторами", "sql": ["SELECT b.Title, a.FullName, b.PublishYear", "FROM Books b", "JOIN Authors a ON a.AuthorID = b.AuthorID", "ORDER BY b.PublishYear;"] },
+    { "title": "Книги по жанрам", "sql": "SELECT Genre, COUNT(*) AS Cnt, AVG(Price) AS AvgPrice FROM Books GROUP BY Genre;" }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "modules": [
+    {
+      "id": "m1",
+      "title": "Знакомство со швейной фабрикой",
+      "short": "Ассортимент, журнал выпуска и брак, заказы и сроки отгрузки.",
+      "goal": "Разберёмся, как устроены данные производства: от ассортиментной группы до партии, сданной в ОТК, и от заказа до отгрузки. Научимся считать годный выпуск, процент брака и выручку так, как их считает планово-экономический отдел.",
+      "lessons": [
+        {
+          "id": "l1", "title": "Ассортимент и выпуск", "minutes": 12,
+          "steps": [
+            { "t": "text", "title": "Группы → модели → выпуск",
+              "text": [
+                "Ассортимент фабрики разбит на **10 групп** (`ProductGroups`): футболки, рубашки, платья, брюки, юбки, худи, куртки, пальто, школьная форма и спецодежда.",
+                "",
+                "В каждой группе — несколько **моделей** (`Products`) со своим артикулом, тканью, нормой времени на пошив (`NormMinutes`), себестоимостью и оптовой ценой.",
+                "",
+                "Каждый раз, когда швея сдаёт пошитую партию в ОТК, в **журнал выпуска** (`ProductionLog`) попадает строка: когда (`ProducedAt` — дата **и время**), какой цех, какая швея, какая модель, сколько пошито (`QtyMade`) и сколько из них забраковано (`QtyDefect`).",
+                "",
+                "> **Главная формула.** Годные изделия = `QtyMade - QtyDefect`. Процент брака = `QtyDefect * 100.0 / QtyMade`."
+              ] },
+            { "t": "example", "title": "Сколько моделей в каждой группе",
+              "text": "LEFT JOIN нужен, чтобы увидеть и группы без моделей (если бы такие были).",
+              "sql": ["SELECT g.GroupName, g.Season, COUNT(p.ProductID) AS Models", "FROM ProductGroups g", "LEFT JOIN Products p ON p.GroupID = g.GroupID", "GROUP BY g.GroupName, g.Season;"] },
+            { "t": "example", "title": "Партии одного дня",
+              "text": "Обратите внимание на фильтр по дню: так как в `ProducedAt` есть время, берём диапазон «с начала дня до начала следующего».",
+              "sql": ["SELECT LogID, ProducedAt, WorkshopID, EmployeeID, ProductID, QtyMade, QtyDefect,", "       QtyMade - QtyDefect AS Good", "FROM ProductionLog", "WHERE ProducedAt >= '20261015' AND ProducedAt < '20261016';"] },
+            { "t": "quiz", "id": "q1", "title": "Годные изделия",
+              "q": "Швея сдала партию: `QtyMade = 40`, `QtyDefect = 2`. Сколько годных изделий в партии?",
+              "options": ["40", "38", "42", "2"],
+              "answer": 1,
+              "explain": "`QtyMade` — сколько пошито всего, `QtyDefect` — сколько из них забраковано. Годные: 40 − 2 = 38." },
+            { "t": "task", "id": "t1", "title": "Годные за 15 октября",
+              "text": "Посчитайте, сколько годных изделий сдано 15 октября 2026 года. Столбец — `Good`.",
+              "solution": "SELECT SUM(QtyMade - QtyDefect) AS Good FROM ProductionLog WHERE ProducedAt >= '20261015' AND ProducedAt < '20261016';",
+              "wrong": ["SELECT SUM(QtyMade) AS Good FROM ProductionLog WHERE ProducedAt >= '20261015' AND ProducedAt < '20261016';"],
+              "check": { "names": true } }
+          ],
+          "training": [
+            { "t": "quiz", "id": "tq1",
+              "q": "Почему условие `WHERE ProducedAt = '20261015'` не найдёт партии за 15 октября?",
+              "options": ["Дату нужно писать через точки", "В `ProducedAt` хранится ещё и время — совпадут только партии, сданные ровно в 00:00", "Такого дня нет в базе", "Нужно писать `LIKE '2026-10-15%'`"],
+              "answer": 1,
+              "explain": "Строка `'20261015'` превращается в 15.10.2026 00:00:00. Для дня нужен диапазон: `>= '20261015' AND < '20261016'`." },
+            { "t": "task", "id": "tt1", "title": "Брак группы",
+              "text": "Посчитайте процент брака по моделям группы 8 («Пальто и плащи») за всё время. Столбец — `DefectPct`, тип `DECIMAL(5,2)`.",
+              "solution": "SELECT CAST(SUM(l.QtyDefect) * 100.0 / SUM(l.QtyMade) AS DECIMAL(5,2)) AS DefectPct FROM ProductionLog l JOIN Products p ON p.ProductID = l.ProductID WHERE p.GroupID = 8;",
+              "hint": "Сначала сумма брака и сумма пошитого, потом деление: `SUM(QtyDefect) * 100.0 / SUM(QtyMade)`.",
+              "check": { "names": true } }
+          ]
+        },
+        {
+          "id": "l2", "title": "Заказы и сроки", "minutes": 12,
+          "steps": [
+            { "t": "text", "title": "Заказ, срок и отгрузка",
+              "text": [
+                "Заказчик оформляет **заказ** (`Orders`) с несколькими **строками** (`OrderLines`): модель, количество, цена за штуку. У заказа есть срок по договору `DueDate` и фактическая дата отгрузки `ShipDate`.",
+                "",
+                "Статусы: «Новый» → «В работе» → «Отгружен»; бывает «Отменён». Пока заказ не отгружен, `ShipDate` равна **NULL**.",
+                "",
+                "- выручка = `Qty * Price * (1 - DiscountPct / 100)` по **отгруженным** заказам;",
+                "- отгрузили с опозданием — `ShipDate > DueDate`;",
+                "- просрочен сейчас — `ShipDate IS NULL`, заказ не отменён и `DueDate` уже прошла.",
+                "",
+                "! Сравнение с NULL никогда не даёт TRUE: условие `ShipDate > DueDate` для неотгруженного заказа не выполняется — такие заказы проверяйте отдельно через `IS NULL`."
+              ] },
+            { "t": "widget", "title": "Как NULL ведёт себя в условиях", "w": "nullTruth",
+              "text": "Вспомним трёхзначную логику: именно из-за неё неотгруженные заказы «выпадают» из сравнений дат." },
+            { "t": "example", "title": "Заказы по статусам",
+              "sql": ["SELECT Status, COUNT(*) AS Orders,", "       SUM(CASE WHEN ShipDate > DueDate THEN 1 ELSE 0 END) AS ShippedLate,", "       SUM(CASE WHEN ShipDate IS NULL THEN 1 ELSE 0 END) AS NotShipped", "FROM Orders", "GROUP BY Status;"] },
+            { "t": "task", "id": "t2", "title": "Выручка октября",
+              "text": "Посчитайте выручку по заказам, отгруженным в октябре 2026 года. Столбец — `Revenue`, тип `DECIMAL(18,2)`.",
+              "solution": ["SELECT CAST(SUM(ol.Qty * ol.Price * (1 - o.DiscountPct / 100)) AS DECIMAL(18,2)) AS Revenue", "FROM Orders o", "JOIN OrderLines ol ON ol.OrderID = o.OrderID", "WHERE o.Status = N'Отгружен' AND o.ShipDate >= '20261001' AND o.ShipDate < '20261101';"],
+              "wrong": ["SELECT CAST(SUM(ol.Qty * ol.Price) AS DECIMAL(18,2)) AS Revenue FROM Orders o JOIN OrderLines ol ON ol.OrderID = o.OrderID WHERE o.Status = N'Отгружен' AND o.ShipDate >= '20261001' AND o.ShipDate < '20261101';"],
+              "check": { "names": true } }
+          ],
+          "training": [
+            { "t": "order", "id": "to1",
+              "q": "Расставьте статусы заказа в порядке его жизни:",
+              "items": ["Новый", "В работе", "Отгружен"],
+              "explain": "Заказ создают, запускают в производство, затем отгружают заказчику. «Отменён» может случиться на любом этапе до отгрузки." },
+            { "t": "task", "id": "tt2", "title": "Опоздания 2026 года",
+              "text": "Сколько заказов, отгруженных в 2026 году, отгружено позже срока? Столбец — `Late`.",
+              "solution": "SELECT COUNT(*) AS Late FROM Orders WHERE Status = N'Отгружен' AND ShipDate >= '20260101' AND ShipDate < '20270101' AND ShipDate > DueDate;",
+              "check": { "names": true } }
+          ]
+        }
+      ],
+      "homework": [
+        { "id": "hw1", "title": "Выпуск цехов по кварталам",
+          "text": "Для каждого цеха выведите выпуск годных изделий по кварталам 2026 года: `WorkshopName`, номер квартала `Q`, `Good`. Сортировка — по цеху, затем по кварталу.",
+          "solution": ["SELECT w.WorkshopName, DATEPART(quarter, l.ProducedAt) AS Q, SUM(l.QtyMade - l.QtyDefect) AS Good", "FROM ProductionLog l", "JOIN Workshops w ON w.WorkshopID = l.WorkshopID", "WHERE l.ProducedAt >= '20260101' AND l.ProducedAt < '20270101'", "GROUP BY w.WorkshopName, DATEPART(quarter, l.ProducedAt)", "ORDER BY w.WorkshopName, Q;"],
+          "check": { "names": true, "ordered": true } },
+        { "id": "hw2", "title": "Заказчики с опозданиями",
+          "text": "Выведите заказчиков, которым за всё время хотя бы 3 заказа отгрузили с опозданием: `CustomerName`, число таких заказов `LateOrders` и максимальное опоздание в днях `MaxLateDays`. Сортировка — по убыванию `LateOrders`.",
+          "solution": ["SELECT c.CustomerName, COUNT(*) AS LateOrders, MAX(DATEDIFF(day, o.DueDate, o.ShipDate)) AS MaxLateDays", "FROM Orders o", "JOIN Customers c ON c.CustomerID = o.CustomerID", "WHERE o.ShipDate > o.DueDate", "GROUP BY c.CustomerName", "HAVING COUNT(*) >= 3", "ORDER BY LateOrders DESC;"],
+          "check": { "names": true, "order": [[1, "desc"]] } }
+      ]
+    }
+  ]
+}

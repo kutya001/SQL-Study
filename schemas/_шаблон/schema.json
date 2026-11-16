@@ -1,0 +1,37 @@
+{
+  "id": "library",
+  "title": "Библиотека (шаблон)",
+  "icon": "📚",
+  "dbName": "Library",
+  "version": "1.0",
+  "author": "Ваше имя",
+  "description": [
+    "Маленькая база-образец: авторы и книги. Скопируйте эту папку, переименуйте её (без «_» в начале), поменяйте **id**, **dbName** и наполните своими таблицами.",
+    "",
+    "> Папки, имя которых начинается с «_», курс не загружает — поэтому шаблон не виден в списке баз."
+  ],
+  "tables": [
+    {
+      "name": "Authors", "title": "Авторы",
+      "columns": [
+        { "name": "AuthorID", "type": "int", "pk": true, "desc": "Код автора" },
+        { "name": "FullName", "type": "nvarchar(100)", "desc": "Имя автора" },
+        { "name": "Country", "type": "nvarchar(50)", "desc": "Страна" },
+        { "name": "BirthYear", "type": "int", "desc": "Год рождения (может быть NULL)" }
+      ]
+    },
+    {
+      "name": "Books", "title": "Книги",
+      "columns": [
+        { "name": "BookID", "type": "int", "pk": true, "desc": "Код книги" },
+        { "name": "Title", "type": "nvarchar(200)", "desc": "Название" },
+        { "name": "AuthorID", "type": "int", "fk": "Authors.AuthorID", "desc": "Автор" },
+        { "name": "Genre", "type": "nvarchar(50)", "desc": "Жанр" },
+        { "name": "PublishYear", "type": "int", "desc": "Год издания" },
+        { "name": "Pages", "type": "int", "desc": "Страниц" },
+        { "name": "Price", "type": "decimal(10,2)", "desc": "Цена, сом" },
+        { "name": "AddedDate", "type": "date", "desc": "Дата поступления в библиотеку" }
+      ]
+    }
+  ]
+}

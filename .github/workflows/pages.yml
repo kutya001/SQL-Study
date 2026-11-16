@@ -1,0 +1,70 @@
+# Проверка курса и публикация на GitHub Pages.
+# Один раз: Settings → Pages → Build and deployment → Source: «GitHub Actions».
+name: Проверка и публикация
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # сохранить пересобранный schemas/index.js
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Уроки, ДЗ, тренажёр и шпаргалка — все эталоны выполняются
+        run: node tools/validate-course.js
+
+      - name: Учебные базы из schemas/ — данные, связи и задания
+        run: node tools/validate-packs.js
+
+      - name: Пересобрать schemas/index.js
+        run: node tools/build-index.js
+
+      - name: Сохранить обновлённый schemas/index.js в репозиторий
+        if: github.event_name != 'pull_request'
+        run: |
+          if [ -n "$(git status --porcelain -- schemas/index.js)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add schemas/index.js
+            git commit -m "Пересобран schemas/index.js"
+            git push
+          fi
+
+      - name: Настроить Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      - name: Подготовить сайт
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: check
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Опубликовать на GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,457 @@
+{
+  "sets": [
+    {
+      "id": "s1",
+      "title": "Первые запросы к карго",
+      "short": "Склады, тарифы, отправления: SELECT, WHERE, ORDER BY, TOP, DISTINCT.",
+      "desc": "Разминка на новой базе. Таблицы и столбцы — на схеме базы **Cargo**.",
+      "tasks": [
+        {
+          "id": "s1-1",
+          "title": "Склады в России",
+          "text": "Выведите название, город и вид всех точек компании в России.",
+          "solution": "SELECT WarehouseName, City, Kind FROM Warehouses WHERE Country = N'Россия';"
+        },
+        {
+          "id": "s1-2",
+          "title": "Действующие тарифы",
+          "text": "Выведите название, цену за килограмм и нормативный срок действующих тарифов (`IsActive = 1`), от дешёвых к дорогим по цене за килограмм.",
+          "solution": "SELECT TariffName, PricePerKg, DaysNorm FROM Tariffs WHERE IsActive = 1 ORDER BY PricePerKg;",
+          "check": {
+            "order": [
+              [
+                1,
+                "asc"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "s1-3",
+          "title": "Тяжёлые грузы",
+          "text": "Выведите трек-номер и вес отправлений тяжелее 250 кг, от самого тяжёлого.",
+          "solution": "SELECT TrackNo, WeightKg FROM Shipments WHERE WeightKg > 250 ORDER BY WeightKg DESC;",
+          "check": {
+            "order": [
+              [
+                1,
+                "desc"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "s1-4",
+          "title": "Найти посылку",
+          "text": "Клиент спрашивает о посылке с трек-номером `CRG100111057`. Выведите её статус, дату приёма и дату выдачи.",
+          "solution": "SELECT Status, CreatedAt, DeliveredAt FROM Shipments WHERE TrackNo = 'CRG100111057';"
+        },
+        {
+          "id": "s1-5",
+          "title": "Десять самых дорогих",
+          "text": "Выведите 10 отправлений с наибольшей стоимостью доставки: трек-номер и `Cost`, от дорогих к дешёвым.",
+          "solution": "SELECT TOP (10) TrackNo, Cost FROM Shipments ORDER BY Cost DESC;",
+          "check": {
+            "order": [
+              [
+                1,
+                "desc"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "s1-6",
+          "title": "Пункты выдачи",
+          "text": "Выведите название пунктов выдачи и код вышестоящего склада (`ParentID`) в алфавитном порядке названий.",
+          "solution": "SELECT WarehouseName, ParentID FROM Warehouses WHERE Kind = N'Пункт выдачи' ORDER BY WarehouseName;",
+          "check": {
+            "order": [
+              [
+                0,
+                "asc"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "s1-7",
+          "title": "Страны присутствия",
+          "text": "Выведите список стран, где есть точки компании, без повторов и по алфавиту.",
+          "solution": "SELECT DISTINCT Country FROM Warehouses ORDER BY Country;",
+          "check": {
+            "order": [
+              [
+                0,
+                "asc"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Функции, NULL и даты",
+      "short": "Страховой сбор, весовые категории, время в пути, работа с датой и временем.",
+      "desc": "`CreatedAt`, `DepartAt`, `ArriveAt`, `DeliveredAt` — это **дата и время**, поэтому день или месяц задаём диапазоном `>= начало AND < начало следующего`.",
+      "tasks": [
+        {
+          "id": "s2-1",
+          "title": "Получатель без телефона",
+          "text": "Выведите трек-номер и имя получателя отправлений, принятых в октябре 2026 года, у которых не указан телефон получателя.",
+          "solution": "SELECT TrackNo, ReceiverName FROM Shipments WHERE ReceiverPhone IS NULL AND CreatedAt >= '20261001' AND CreatedAt < '20261101';"
+        },
+        {
+          "id": "s2-2",
+          "title": "Страховой сбор",
+          "text": "Для отправлений, принятых 30 октября 2026 года, выведите трек-номер, объявленную ценность и страховой сбор `Insurance` = 1% от ценности (0, если ценность не объявлена), тип `DECIMAL(10,2)`.",
+          "solution": "SELECT TrackNo, DeclaredValue, CAST(ISNULL(DeclaredValue, 0) * 0.01 AS DECIMAL(10,2)) AS Insurance FROM Shipments WHERE CreatedAt >= '20261030' AND CreatedAt < '20261031';",
+          "alsoOk": [
+            "SELECT TrackNo, DeclaredValue, CAST(COALESCE(DeclaredValue * 0.01, 0) AS DECIMAL(10,2)) AS Insurance FROM Shipments WHERE CreatedAt >= '20261030' AND CreatedAt < '20261031';"
+          ],
+          "hint": "`NULL * 0.01` даёт NULL. Замените пустую ценность нулём через `ISNULL`.",
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s2-3",
+          "title": "Приём за день",
+          "text": "Выведите `ShipmentID`, время приёма и вес всех отправлений, принятых 15 октября 2026 года.",
+          "solution": "SELECT ShipmentID, CreatedAt, WeightKg FROM Shipments WHERE CreatedAt >= '20261015' AND CreatedAt < '20261016';",
+          "hint": "`CreatedAt = '20261015'` найдёт только посылки, принятые ровно в полночь."
+        },
+        {
+          "id": "s2-4",
+          "title": "В котором часу принимают",
+          "text": "Для отправлений октября 2026 года, принятых в пункте выдачи Бишкек-Восток (`FromWarehouseID = 13`), выведите `ShipmentID` и час приёма `Hr`.",
+          "solution": "SELECT ShipmentID, DATEPART(hour, CreatedAt) AS Hr FROM Shipments WHERE FromWarehouseID = 13 AND CreatedAt >= '20261001' AND CreatedAt < '20261101';",
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s2-5",
+          "title": "Часы в пути",
+          "text": "Для рейсов, которые отправились в октябре 2026 года и уже прибыли, выведите номер рейса, вид транспорта и время в пути в часах `Hours`.",
+          "solution": "SELECT TripNo, Transport, DATEDIFF(hour, DepartAt, ArriveAt) AS Hours FROM Trips WHERE DepartAt >= '20261001' AND DepartAt < '20261101' AND ArriveAt IS NOT NULL;",
+          "alsoOk": [
+            "SELECT TripNo, Transport, DATEDIFF(hour, DepartAt, ArriveAt) AS Hours FROM Trips WHERE DepartAt >= '20261001' AND DepartAt < '20261101' AND Status = N'Прибыл';"
+          ],
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s2-6",
+          "title": "Весовая категория",
+          "text": [
+            "Для отправлений, принятых с 1 по 7 октября 2026 года включительно, выведите трек-номер, вес и категорию `WeightClass`:",
+            "- «до 1 кг» — вес не больше 1;",
+            "- «до 10 кг» — не больше 10;",
+            "- «до 30 кг» — не больше 30;",
+            "- «груз» — тяжелее."
+          ],
+          "solution": "SELECT TrackNo, WeightKg, CASE WHEN WeightKg <= 1 THEN N'до 1 кг' WHEN WeightKg <= 10 THEN N'до 10 кг' WHEN WeightKg <= 30 THEN N'до 30 кг' ELSE N'груз' END AS WeightClass FROM Shipments WHERE CreatedAt >= '20261001' AND CreatedAt < '20261008';",
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s2-7",
+          "title": "Стаж водителей",
+          "text": "Для работающих водителей выведите ФИО, дату приёма и число **полных** лет работы на 31 октября 2026 года — `YearsWorked`.",
+          "solution": [
+            "SELECT FullName, HireDate,",
+            "       DATEDIFF(year, HireDate, '20261031')",
+            "         - CASE WHEN DATEADD(year, DATEDIFF(year, HireDate, '20261031'), HireDate) > '20261031' THEN 1 ELSE 0 END AS YearsWorked",
+            "FROM Employees",
+            "WHERE Position = N'Водитель' AND FireDate IS NULL;"
+          ],
+          "check": {
+            "names": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "Группировка и соединения",
+      "short": "Выручка по тарифам и направлениям, нагрузка водителей, поиск «чего нет».",
+      "desc": "Выручка = сумма `Cost` по отправлениям, кроме отменённых. Страну назначения берём из склада назначения (`ToWarehouseID`).",
+      "tasks": [
+        {
+          "id": "s3-1",
+          "title": "Отправления по статусам",
+          "text": "Сколько отправлений в каждом статусе? Выведите `Status` и `Cnt`.",
+          "solution": "SELECT Status, COUNT(*) AS Cnt FROM Shipments GROUP BY Status;",
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s3-2",
+          "title": "Выручка по тарифам",
+          "text": "Для отправлений, принятых в 2026 году (кроме отменённых), выведите название тарифа, число отправлений `Shipments` и выручку `Revenue` (`DECIMAL(18,2)`), от большей выручки к меньшей.",
+          "solution": [
+            "SELECT t.TariffName, COUNT(*) AS Shipments, CAST(SUM(s.Cost) AS DECIMAL(18,2)) AS Revenue",
+            "FROM Shipments s",
+            "JOIN Tariffs t ON t.TariffID = s.TariffID",
+            "WHERE s.Status <> N'Отменён' AND s.CreatedAt >= '20260101' AND s.CreatedAt < '20270101'",
+            "GROUP BY t.TariffName",
+            "ORDER BY Revenue DESC;"
+          ],
+          "check": {
+            "names": true,
+            "order": [
+              [
+                2,
+                "desc"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "s3-3",
+          "title": "Направления 2026 года",
+          "text": "По отправлениям 2026 года (кроме отменённых) выведите страну назначения `Country`, число отправлений `Shipments` и общий вес `TotalKg`.",
+          "solution": [
+            "SELECT w.Country, COUNT(*) AS Shipments, SUM(s.WeightKg) AS TotalKg",
+            "FROM Shipments s",
+            "JOIN Warehouses w ON w.WarehouseID = s.ToWarehouseID",
+            "WHERE s.Status <> N'Отменён' AND s.CreatedAt >= '20260101' AND s.CreatedAt < '20270101'",
+            "GROUP BY w.Country;"
+          ],
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s3-4",
+          "title": "Крупные отправители",
+          "text": "Выведите ИП и компании (не физлица), принёсшие за всё время больше 1 000 000 сом выручки: `CustomerName`, `Shipments`, `Revenue` (`DECIMAL(18,2)`), по убыванию выручки.",
+          "solution": [
+            "SELECT c.CustomerName, COUNT(*) AS Shipments, CAST(SUM(s.Cost) AS DECIMAL(18,2)) AS Revenue",
+            "FROM Shipments s",
+            "JOIN Customers c ON c.CustomerID = s.CustomerID",
+            "WHERE c.ClientType <> N'Физлицо' AND s.Status <> N'Отменён'",
+            "GROUP BY c.CustomerName",
+            "HAVING SUM(s.Cost) > 1000000",
+            "ORDER BY Revenue DESC;"
+          ],
+          "check": {
+            "names": true,
+            "order": [
+              [
+                2,
+                "desc"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "s3-5",
+          "title": "Тариф без отправлений",
+          "text": "Выведите название и вид транспорта тарифов, по которым не было ни одного отправления.",
+          "solution": "SELECT t.TariffName, t.Transport FROM Tariffs t WHERE NOT EXISTS (SELECT 1 FROM Shipments s WHERE s.TariffID = t.TariffID);",
+          "alsoOk": [
+            "SELECT t.TariffName, t.Transport FROM Tariffs t LEFT JOIN Shipments s ON s.TariffID = t.TariffID WHERE s.ShipmentID IS NULL;"
+          ]
+        },
+        {
+          "id": "s3-6",
+          "title": "Пункт выдачи без посылок",
+          "text": "Выведите название и дату открытия точек, куда ещё не было ни одного отправления.",
+          "solution": "SELECT w.WarehouseName, w.OpenDate FROM Warehouses w LEFT JOIN Shipments s ON s.ToWarehouseID = w.WarehouseID WHERE s.ShipmentID IS NULL;",
+          "alsoOk": [
+            "SELECT WarehouseName, OpenDate FROM Warehouses w WHERE NOT EXISTS (SELECT 1 FROM Shipments s WHERE s.ToWarehouseID = w.WarehouseID);"
+          ]
+        },
+        {
+          "id": "s3-7",
+          "title": "Рейсы водителей",
+          "text": "Сколько рейсов (кроме отменённых) провёл каждый водитель в 2026 году? Выведите `FullName` и `Trips`, по убыванию.",
+          "solution": [
+            "SELECT e.FullName, COUNT(*) AS Trips",
+            "FROM Trips t",
+            "JOIN Employees e ON e.EmployeeID = t.DriverID",
+            "WHERE t.Status <> N'Отменён' AND t.DepartAt >= '20260101' AND t.DepartAt < '20270101'",
+            "GROUP BY e.EmployeeID, e.FullName",
+            "ORDER BY Trips DESC;"
+          ],
+          "check": {
+            "names": true,
+            "order": [
+              [
+                1,
+                "desc"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "s3-8",
+          "title": "Претензии по причинам",
+          "text": "Для каждой причины претензии выведите `Reason`, число претензий `Claims` и сколько всего выплачено `Paid` (`DECIMAL(18,2)`; если не выплачивали — 0).",
+          "solution": "SELECT Reason, COUNT(*) AS Claims, CAST(ISNULL(SUM(Amount), 0) AS DECIMAL(18,2)) AS Paid FROM Claims GROUP BY Reason;",
+          "hint": "`SUM` пропускает NULL. Но если в группе все значения NULL, сумма тоже будет NULL — оберните в `ISNULL`.",
+          "check": {
+            "names": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "Аналитика: CTE и окна",
+      "short": "Доставка в срок, платное хранение, загрузка рейсов, удержание клиентов.",
+      "desc": "Отчёты для руководителя логистики. Промежуточные итоги считайте в CTE (`WITH …`), а соединяйте уже готовые итоги — так не будет «размножения» строк.",
+      "tasks": [
+        {
+          "id": "s4-1",
+          "title": "Доставка в срок по тарифам",
+          "text": "По отправлениям, принятым в 2026 году и уже доставленным рейсом до места (рейс прибыл), выведите `TariffName`, число таких отправлений `Arrived` и долю доставленных в срок `OnTimePct` (`DECIMAL(5,2)`). Срок = дни от `CreatedAt` до прибытия рейса, в срок — если не больше `DaysNorm`.",
+          "solution": [
+            "SELECT tr.TariffName, COUNT(*) AS Arrived,",
+            "       CAST(100.0 * SUM(CASE WHEN DATEDIFF(day, s.CreatedAt, t.ArriveAt) <= tr.DaysNorm THEN 1 ELSE 0 END) / COUNT(*) AS DECIMAL(5,2)) AS OnTimePct",
+            "FROM Shipments s",
+            "JOIN Trips t ON t.TripID = s.TripID",
+            "JOIN Tariffs tr ON tr.TariffID = s.TariffID",
+            "WHERE t.ArriveAt IS NOT NULL AND s.CreatedAt >= '20260101' AND s.CreatedAt < '20270101'",
+            "GROUP BY tr.TariffName;"
+          ],
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s4-2",
+          "title": "Платное хранение",
+          "text": "Найдите посылки в статусе «Прибыл», которые на 31.10.2026 лежат дольше бесплатного срока точки назначения: `TrackNo`, `WarehouseName` (куда доставить), `DaysWaiting` (дней с прибытия рейса до 31.10.2026) и `FreeStorageDays`.",
+          "solution": [
+            "SELECT s.TrackNo, w.WarehouseName, DATEDIFF(day, t.ArriveAt, '20261031') AS DaysWaiting, w.FreeStorageDays",
+            "FROM Shipments s",
+            "JOIN Trips t ON t.TripID = s.TripID",
+            "JOIN Warehouses w ON w.WarehouseID = s.ToWarehouseID",
+            "WHERE s.Status = N'Прибыл' AND DATEDIFF(day, t.ArriveAt, '20261031') > w.FreeStorageDays;"
+          ],
+          "alsoOk": [
+            "SELECT s.TrackNo, w.WarehouseName, DATEDIFF(day, t.ArriveAt, GETDATE()) AS DaysWaiting, w.FreeStorageDays FROM Shipments s JOIN Trips t ON t.TripID = s.TripID JOIN Warehouses w ON w.WarehouseID = s.ToWarehouseID WHERE s.Status = N'Прибыл' AND DATEDIFF(day, t.ArriveAt, GETDATE()) > w.FreeStorageDays;"
+          ],
+          "hint": "В этой базе `GETDATE()` возвращает 31.10.2026 — можно писать и через него.",
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s4-3",
+          "title": "Выручка по месяцам и рост",
+          "text": "Для каждого месяца 2026 года выведите номер месяца `M`, выручку `Revenue` (по дате приёма, без отменённых), выручку предыдущего месяца `PrevRevenue` и рост в процентах `GrowthPct` (`DECIMAL(6,2)`). Порядок — по месяцам.",
+          "solution": [
+            "WITH M AS (",
+            "    SELECT MONTH(CreatedAt) AS M, SUM(Cost) AS Revenue",
+            "    FROM Shipments",
+            "    WHERE Status <> N'Отменён' AND CreatedAt >= '20260101' AND CreatedAt < '20270101'",
+            "    GROUP BY MONTH(CreatedAt)",
+            ")",
+            "SELECT M, Revenue, LAG(Revenue) OVER (ORDER BY M) AS PrevRevenue,",
+            "       CAST(100.0 * (Revenue - LAG(Revenue) OVER (ORDER BY M)) / LAG(Revenue) OVER (ORDER BY M) AS DECIMAL(6,2)) AS GrowthPct",
+            "FROM M",
+            "ORDER BY M;"
+          ],
+          "check": {
+            "names": true,
+            "ordered": true
+          }
+        },
+        {
+          "id": "s4-4",
+          "title": "Загрузка рейсов по маршрутам",
+          "text": [
+            "Для рейсов, прибывших в 2026 году, посчитайте по каждому маршруту: `FromName` и `ToName` (названия точек), транспорт `Transport`, число рейсов `Trips`, среднее число отправлений на рейс `AvgShipments` и средний вес на рейс `AvgKg` (оба `DECIMAL(8,2)`). Рейсы без посылок тоже учитываются (как 0).",
+            "",
+            "> Сначала посчитайте посылки и вес по каждому рейсу (CTE с LEFT JOIN), потом усредните по маршруту."
+          ],
+          "solution": [
+            "WITH PerTrip AS (",
+            "    SELECT t.TripID, t.FromWarehouseID, t.ToWarehouseID, t.Transport,",
+            "           COUNT(s.ShipmentID) AS Cnt, ISNULL(SUM(s.WeightKg), 0) AS Kg",
+            "    FROM Trips t",
+            "    LEFT JOIN Shipments s ON s.TripID = t.TripID",
+            "    WHERE t.ArriveAt >= '20260101' AND t.ArriveAt < '20270101'",
+            "    GROUP BY t.TripID, t.FromWarehouseID, t.ToWarehouseID, t.Transport",
+            ")",
+            "SELECT wf.WarehouseName AS FromName, wt.WarehouseName AS ToName, p.Transport,",
+            "       COUNT(*) AS Trips,",
+            "       CAST(AVG(p.Cnt * 1.0) AS DECIMAL(8,2)) AS AvgShipments,",
+            "       CAST(AVG(p.Kg) AS DECIMAL(8,2)) AS AvgKg",
+            "FROM PerTrip p",
+            "JOIN Warehouses wf ON wf.WarehouseID = p.FromWarehouseID",
+            "JOIN Warehouses wt ON wt.WarehouseID = p.ToWarehouseID",
+            "GROUP BY wf.WarehouseName, wt.WarehouseName, p.Transport;"
+          ],
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s4-5",
+          "title": "Лучшие точки приёма в стране",
+          "text": "По выручке 2026 года (без отменённых) пронумеруйте точки приёма внутри их страны: `Country`, `WarehouseName`, `Revenue` (`DECIMAL(18,2)`), `Place` (`DENSE_RANK`, 1 — больше всего выручки).",
+          "solution": [
+            "WITH R AS (",
+            "    SELECT w.Country, w.WarehouseName, SUM(s.Cost) AS Revenue",
+            "    FROM Shipments s",
+            "    JOIN Warehouses w ON w.WarehouseID = s.FromWarehouseID",
+            "    WHERE s.Status <> N'Отменён' AND s.CreatedAt >= '20260101' AND s.CreatedAt < '20270101'",
+            "    GROUP BY w.Country, w.WarehouseName",
+            ")",
+            "SELECT Country, WarehouseName, CAST(Revenue AS DECIMAL(18,2)) AS Revenue,",
+            "       DENSE_RANK() OVER (PARTITION BY Country ORDER BY Revenue DESC) AS Place",
+            "FROM R;"
+          ],
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s4-6",
+          "title": "Удержание клиентов",
+          "text": "Сколько клиентов отправляли посылки в 2025 году (`Clients2025`), сколько из них отправляли и в 2026 году (`Returned2026`) и какая это доля в процентах (`RetentionPct`, `DECIMAL(5,2)`)? Отменённые отправления не учитывайте.",
+          "solution": [
+            "WITH A AS (SELECT DISTINCT CustomerID FROM Shipments WHERE Status <> N'Отменён' AND CreatedAt >= '20250101' AND CreatedAt < '20260101'),",
+            "B AS (SELECT DISTINCT CustomerID FROM Shipments WHERE Status <> N'Отменён' AND CreatedAt >= '20260101' AND CreatedAt < '20270101')",
+            "SELECT COUNT(*) AS Clients2025, COUNT(B.CustomerID) AS Returned2026,",
+            "       CAST(100.0 * COUNT(B.CustomerID) / COUNT(*) AS DECIMAL(5,2)) AS RetentionPct",
+            "FROM A LEFT JOIN B ON B.CustomerID = A.CustomerID;"
+          ],
+          "hint": "Список клиентов 2025 года соедините LEFT JOIN со списком клиентов 2026 года. `COUNT(B.CustomerID)` посчитает только тех, кто нашёлся.",
+          "check": {
+            "names": true
+          }
+        },
+        {
+          "id": "s4-7",
+          "title": "Доля претензий по тарифам",
+          "text": "Для каждого тарифа с отправлениями (без отменённых) выведите `TariffName`, число отправлений `Shipments`, число претензий `Claims` и долю претензий `ClaimsPct` (`DECIMAL(5,2)`). Посчитайте отправления и претензии в разных CTE.",
+          "solution": [
+            "WITH S AS (",
+            "    SELECT TariffID, COUNT(*) AS Shipments FROM Shipments WHERE Status <> N'Отменён' GROUP BY TariffID",
+            "), C AS (",
+            "    SELECT s.TariffID, COUNT(*) AS Claims FROM Claims c JOIN Shipments s ON s.ShipmentID = c.ShipmentID GROUP BY s.TariffID",
+            ")",
+            "SELECT t.TariffName, S.Shipments, ISNULL(C.Claims, 0) AS Claims,",
+            "       CAST(100.0 * ISNULL(C.Claims, 0) / S.Shipments AS DECIMAL(5,2)) AS ClaimsPct",
+            "FROM S",
+            "JOIN Tariffs t ON t.TariffID = S.TariffID",
+            "LEFT JOIN C ON C.TariffID = S.TariffID;"
+          ],
+          "check": {
+            "names": true
+          }
+        }
+      ]
+    }
+  ]
+}

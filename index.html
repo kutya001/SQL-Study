@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SELECT с нуля — курс SQL для аналитиков</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%233b5bdb'/%3E%3Ctext x='16' y='21' font-family='monospace' font-size='12' font-weight='700' fill='white' text-anchor='middle'%3ESQL%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header id="topbar" style="display:none"></header>
+  <main id="view"><div class="page"><p class="muted">Загрузка курса…</p></div></main>
+  <footer id="foot">
+    «SELECT с нуля» — открытый курс T-SQL ·
+    код: <a href="https://github.com/kutya001/SQL-Study/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0</a> ·
+    материалы: <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.ru" target="_blank" rel="noopener">CC BY-SA 4.0</a> ·
+    <a href="https://github.com/kutya001/SQL-Study" target="_blank" rel="noopener">исходный код на GitHub</a>
+  </footer>
+  <div id="toasts"></div>
+  <noscript>Для работы курса нужен включённый JavaScript.</noscript>
+
+  <!-- Движок T-SQL и учебная база -->
+  <script src="js/engine/tsql-core.js"></script>
+  <script src="js/engine/tsql-parser.js"></script>
+  <script src="js/engine/tsql-funcs.js"></script>
+  <script src="js/engine/tsql-exec.js"></script>
+  <script src="js/engine/bankdb.js"></script>
+  <script src="js/engine/packs.js"></script>
+  <!-- Настройки курса -->
+  <script src="content/course.js"></script>
+  <script>
+    // Последовательная загрузка модулей курса и приложения
+    (function () {
+      var files = COURSE.moduleFiles.map(function (f) { return 'content/modules/' + f; })
+        .concat(['content/trainer.js', 'content/cheatsheet.js', '?schemas/index.js',
+          'js/app/util.js', 'js/app/storage.js', 'js/app/registry.js', 'js/app/editor.js', 'js/app/grid.js',
+          'js/app/checker.js', 'js/app/widgets.js', 'js/app/app.js', 'js/app/schemapanel.js', 'js/app/pages.js', 'js/app/packpages.js']);
+      var failed = [];
+      function next(i) {
+        if (i >= files.length) {
+          if (failed.length) {
+            document.getElementById('view').innerHTML = '<div class="page"><div class="err-box">Не удалось загрузить файлы: ' + failed.join(', ') + '. Проверьте, что архив распакован полностью.</div></div>';
+            if (!window.App) return;
+          }
+          App.start();
+          return;
+        }
+        // «?» в начале — необязательный файл (его может не быть)
+        var optional = files[i].charAt(0) === '?', src = optional ? files[i].slice(1) : files[i];
+        var s = document.createElement('script');
+        s.src = src;
+        s.onload = function () { next(i + 1); };
+        s.onerror = function () { if (!optional) failed.push(src); next(i + 1); };
+        document.body.appendChild(s);
+      }
+      next(0);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,365 @@
+{
+  "tasks": [
+    {
+      "id": "tr1-1",
+      "level": 1,
+      "title": "Цеха в Бишкеке",
+      "tags": [
+        "WHERE"
+      ],
+      "text": "Выведите название, вид работ и число линий цехов, расположенных в Бишкеке.",
+      "solution": "SELECT WorkshopName, Kind, LinesCount FROM Workshops WHERE City = N'Бишкек';"
+    },
+    {
+      "id": "tr1-2",
+      "level": 1,
+      "title": "Модели из денима",
+      "tags": [
+        "WHERE"
+      ],
+      "text": "Выведите артикул и название моделей, которые шьются из ткани «Деним».",
+      "solution": "SELECT Article, ProductName FROM Products WHERE Fabric = N'Деним';"
+    },
+    {
+      "id": "tr1-3",
+      "level": 1,
+      "title": "Заказы декабря 2025",
+      "tags": [
+        "WHERE",
+        "даты"
+      ],
+      "text": "Выведите номер, дату и заказчика (`OrderID`, `OrderDate`, `CustomerID`) всех заказов, оформленных в декабре 2025 года, по дате заказа.",
+      "solution": "SELECT OrderID, OrderDate, CustomerID FROM Orders WHERE OrderDate >= '20251201' AND OrderDate < '20260101' ORDER BY OrderDate;",
+      "check": {
+        "order": [
+          [
+            1,
+            "asc"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "tr1-4",
+      "level": 1,
+      "title": "Пальто по цене",
+      "tags": [
+        "WHERE",
+        "ORDER BY"
+      ],
+      "text": "Выведите название и оптовую цену моделей группы 8 («Пальто и плащи»), от дешёвых к дорогим.",
+      "solution": "SELECT ProductName, WholesalePrice FROM Products WHERE GroupID = 8 ORDER BY WholesalePrice;",
+      "check": {
+        "order": [
+          [
+            1,
+            "asc"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "tr2-1",
+      "level": 2,
+      "title": "Префикс артикула",
+      "tags": [
+        "строки"
+      ],
+      "text": "Артикул состоит из префикса группы и номера через дефис (`FT-101`). Для моделей в производстве (`IsActive = 1`) выведите `Article` и префикс `Prefix` — всё, что до дефиса.",
+      "solution": "SELECT Article, LEFT(Article, CHARINDEX('-', Article) - 1) AS Prefix FROM Products WHERE IsActive = 1;",
+      "alsoOk": [
+        "SELECT Article, LEFT(Article, 2) AS Prefix FROM Products WHERE IsActive = 1;"
+      ],
+      "check": {
+        "names": true
+      }
+    },
+    {
+      "id": "tr2-2",
+      "level": 2,
+      "title": "Месяц отгрузки",
+      "tags": [
+        "даты",
+        "FORMAT"
+      ],
+      "text": "Для заказов, отгруженных в III квартале 2026 года (июль–сентябрь), выведите `OrderID` и месяц отгрузки `ShipMonth` в формате «ГГГГ-ММ».",
+      "solution": "SELECT OrderID, FORMAT(ShipDate, 'yyyy-MM') AS ShipMonth FROM Orders WHERE ShipDate >= '20260701' AND ShipDate < '20261001';",
+      "alsoOk": [
+        "SELECT OrderID, CONVERT(VARCHAR(7), ShipDate, 120) AS ShipMonth FROM Orders WHERE ShipDate >= '20260701' AND ShipDate < '20261001';"
+      ],
+      "check": {
+        "names": true
+      }
+    },
+    {
+      "id": "tr2-3",
+      "level": 2,
+      "title": "Размеры от и до",
+      "tags": [
+        "строки",
+        "CAST"
+      ],
+      "text": "Размерный ряд записан как «42-56». Выведите `Article`, наименьший размер `MinSize` и наибольший `MaxSize` — как целые числа.",
+      "solution": "SELECT Article, CAST(LEFT(SizeRange, CHARINDEX('-', SizeRange) - 1) AS INT) AS MinSize, CAST(SUBSTRING(SizeRange, CHARINDEX('-', SizeRange) + 1, 10) AS INT) AS MaxSize FROM Products;",
+      "hint": "`CHARINDEX('-', SizeRange)` — позиция дефиса. Слева от неё — минимальный размер, справа — максимальный.",
+      "check": {
+        "names": true
+      }
+    },
+    {
+      "id": "tr2-4",
+      "level": 2,
+      "title": "Местный формат телефона",
+      "tags": [
+        "строки",
+        "NULL"
+      ],
+      "text": "Для сотрудников цеха 2 с указанным телефоном выведите `FullName` и `LocalPhone`: 0 и девять цифр без кода страны (+996555123456 → 0555123456).",
+      "solution": "SELECT FullName, '0' + SUBSTRING(Phone, 5, 20) AS LocalPhone FROM Employees WHERE WorkshopID = 2 AND Phone IS NOT NULL;",
+      "check": {
+        "names": true
+      }
+    },
+    {
+      "id": "tr3-1",
+      "level": 3,
+      "title": "Заказы по типам заказчиков",
+      "tags": [
+        "JOIN",
+        "GROUP BY"
+      ],
+      "text": "Сколько заказов (кроме отменённых) сделали заказчики каждого типа? Выведите `CustomerType` и `Orders`, по убыванию.",
+      "solution": "SELECT c.CustomerType, COUNT(*) AS Orders FROM Orders o JOIN Customers c ON c.CustomerID = o.CustomerID WHERE o.Status <> N'Отменён' GROUP BY c.CustomerType ORDER BY Orders DESC;",
+      "check": {
+        "names": true,
+        "order": [
+          [
+            1,
+            "desc"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "tr3-2",
+      "level": 3,
+      "title": "Средний разряд по цехам",
+      "tags": [
+        "JOIN",
+        "GROUP BY"
+      ],
+      "text": "Для каждого цеха с работающими швеями-мотористками выведите `WorkshopName`, число швей `Sewers` и средний разряд `AvgGrade` (`DECIMAL(4,2)`).",
+      "solution": "SELECT w.WorkshopName, COUNT(*) AS Sewers, CAST(AVG(e.Grade * 1.0) AS DECIMAL(4,2)) AS AvgGrade FROM Employees e JOIN Workshops w ON w.WorkshopID = e.WorkshopID WHERE e.Position = N'Швея-мотористка' AND e.FireDate IS NULL GROUP BY w.WorkshopName;",
+      "hint": "`AVG` по целому столбцу даёт целое число. Умножьте на `1.0`.",
+      "check": {
+        "names": true
+      }
+    },
+    {
+      "id": "tr3-3",
+      "level": 3,
+      "title": "Бригады мастеров",
+      "tags": [
+        "self-join",
+        "GROUP BY"
+      ],
+      "text": "Для каждого мастера выведите его ФИО `Master` и число работающих подчинённых `Staff`, по убыванию.",
+      "solution": "SELECT m.FullName AS Master, COUNT(*) AS Staff FROM Employees e JOIN Employees m ON m.EmployeeID = e.ManagerID WHERE m.Position = N'Мастер' AND e.FireDate IS NULL GROUP BY m.EmployeeID, m.FullName ORDER BY Staff DESC;",
+      "check": {
+        "names": true,
+        "order": [
+          [
+            1,
+            "desc"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "tr3-4",
+      "level": 3,
+      "title": "Отгружено по странам",
+      "tags": [
+        "JOIN",
+        "GROUP BY"
+      ],
+      "text": "Сколько изделий отгружено в 2026 году в каждую страну? Выведите `Country` и `Qty`.",
+      "solution": "SELECT c.Country, SUM(ol.Qty) AS Qty FROM Orders o JOIN Customers c ON c.CustomerID = o.CustomerID JOIN OrderLines ol ON ol.OrderID = o.OrderID WHERE o.Status = N'Отгружен' AND o.ShipDate >= '20260101' AND o.ShipDate < '20270101' GROUP BY c.Country;",
+      "check": {
+        "names": true
+      }
+    },
+    {
+      "id": "tr4-1",
+      "level": 4,
+      "title": "Зарплатный проект",
+      "tags": [
+        "две базы",
+        "EXISTS"
+      ],
+      "text": "Часть сотрудников фабрики — клиенты Учебного банка. Найдите их по совпадению телефона: выведите `FullName` и `Phone` сотрудника. Клиенты банка — в таблице `Bank.dbo.Clients`.",
+      "solution": "SELECT e.FullName, e.Phone FROM Employees e WHERE EXISTS (SELECT 1 FROM Bank.dbo.Clients c WHERE c.Phone = e.Phone);",
+      "alsoOk": [
+        "SELECT DISTINCT e.FullName, e.Phone FROM Sewing.dbo.Employees e JOIN Bank.dbo.Clients c ON c.Phone = e.Phone;"
+      ],
+      "hint": "Таблица из другой базы — по полному имени `База.dbo.Таблица`."
+    },
+    {
+      "id": "tr4-2",
+      "level": 4,
+      "title": "Дороже средней по группе",
+      "tags": [
+        "подзапрос"
+      ],
+      "text": "Выведите артикул, название и оптовую цену моделей, которые дороже средней оптовой цены моделей **своей** ассортиментной группы.",
+      "solution": "SELECT p.Article, p.ProductName, p.WholesalePrice FROM Products p WHERE p.WholesalePrice > (SELECT AVG(p2.WholesalePrice) FROM Products p2 WHERE p2.GroupID = p.GroupID);",
+      "alsoOk": [
+        "WITH A AS (SELECT GroupID, AVG(WholesalePrice) AS AvgPrice FROM Products GROUP BY GroupID) SELECT p.Article, p.ProductName, p.WholesalePrice FROM Products p JOIN A ON A.GroupID = p.GroupID WHERE p.WholesalePrice > A.AvgPrice;"
+      ]
+    },
+    {
+      "id": "tr4-3",
+      "level": 4,
+      "title": "Цепочка руководителей",
+      "tags": [
+        "рекурсия"
+      ],
+      "text": "Выведите всю цепочку руководителей сотрудника с `EmployeeID = 42` снизу вверх: `Lvl` (1 — непосредственный руководитель), `FullName`, `Position`.",
+      "solution": [
+        "WITH Up AS (",
+        "    SELECT m.EmployeeID, m.FullName, m.Position, m.ManagerID, 1 AS Lvl",
+        "    FROM Employees e JOIN Employees m ON m.EmployeeID = e.ManagerID",
+        "    WHERE e.EmployeeID = 42",
+        "    UNION ALL",
+        "    SELECT m.EmployeeID, m.FullName, m.Position, m.ManagerID, u.Lvl + 1",
+        "    FROM Up u JOIN Employees m ON m.EmployeeID = u.ManagerID",
+        ")",
+        "SELECT Lvl, FullName, Position FROM Up ORDER BY Lvl;"
+      ],
+      "check": {
+        "names": true,
+        "ordered": true
+      }
+    },
+    {
+      "id": "tr4-4",
+      "level": 4,
+      "title": "Только школьная форма",
+      "tags": [
+        "EXCEPT"
+      ],
+      "text": "Выведите названия заказчиков, которые заказывали модели группы 9 («Школьная форма»), но ни разу не заказывали модели группы 3 («Платья»).",
+      "solution": [
+        "SELECT c.CustomerName FROM Customers c JOIN Orders o ON o.CustomerID = c.CustomerID JOIN OrderLines ol ON ol.OrderID = o.OrderID JOIN Products p ON p.ProductID = ol.ProductID WHERE p.GroupID = 9",
+        "EXCEPT",
+        "SELECT c.CustomerName FROM Customers c JOIN Orders o ON o.CustomerID = c.CustomerID JOIN OrderLines ol ON ol.OrderID = o.OrderID JOIN Products p ON p.ProductID = ol.ProductID WHERE p.GroupID = 3;"
+      ],
+      "alsoOk": [
+        "SELECT c.CustomerName FROM Customers c WHERE EXISTS (SELECT 1 FROM Orders o JOIN OrderLines ol ON ol.OrderID = o.OrderID JOIN Products p ON p.ProductID = ol.ProductID WHERE o.CustomerID = c.CustomerID AND p.GroupID = 9) AND NOT EXISTS (SELECT 1 FROM Orders o JOIN OrderLines ol ON ol.OrderID = o.OrderID JOIN Products p ON p.ProductID = ol.ProductID WHERE o.CustomerID = c.CustomerID AND p.GroupID = 3);"
+      ],
+      "hint": "`EXCEPT` оставляет строки первого запроса, которых нет во втором."
+    },
+    {
+      "id": "tr5-1",
+      "level": 5,
+      "title": "Брак: скользящее среднее",
+      "tags": [
+        "окна",
+        "рамка"
+      ],
+      "text": "Для каждого месяца 2026 года выведите номер месяца `M`, процент брака за месяц `DefectPct` и среднее этого процента за текущий и два предыдущих месяца `Avg3` (оба `DECIMAL(5,2)`), по порядку месяцев.",
+      "solution": [
+        "WITH M AS (",
+        "    SELECT MONTH(ProducedAt) AS M, SUM(QtyDefect) * 100.0 / SUM(QtyMade) AS DefectPct",
+        "    FROM ProductionLog",
+        "    WHERE ProducedAt >= '20260101' AND ProducedAt < '20270101'",
+        "    GROUP BY MONTH(ProducedAt)",
+        ")",
+        "SELECT M, CAST(DefectPct AS DECIMAL(5,2)) AS DefectPct,",
+        "       CAST(AVG(DefectPct) OVER (ORDER BY M ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS DECIMAL(5,2)) AS Avg3",
+        "FROM M ORDER BY M;"
+      ],
+      "check": {
+        "names": true,
+        "ordered": true
+      }
+    },
+    {
+      "id": "tr5-2",
+      "level": 5,
+      "title": "Пиковый месяц каждой группы",
+      "tags": [
+        "окна",
+        "ROW_NUMBER"
+      ],
+      "text": "Для каждой ассортиментной группы найдите месяц (за всё время) с наибольшим выпуском годных изделий: `GroupName`, `YM` (формат «ГГГГ-ММ»), `Good`. При равенстве — более ранний месяц.",
+      "solution": [
+        "WITH S AS (",
+        "    SELECT g.GroupName, FORMAT(l.ProducedAt, 'yyyy-MM') AS YM, SUM(l.QtyMade - l.QtyDefect) AS Good",
+        "    FROM ProductionLog l",
+        "    JOIN Products p ON p.ProductID = l.ProductID",
+        "    JOIN ProductGroups g ON g.GroupID = p.GroupID",
+        "    GROUP BY g.GroupName, FORMAT(l.ProducedAt, 'yyyy-MM')",
+        "), R AS (",
+        "    SELECT GroupName, YM, Good, ROW_NUMBER() OVER (PARTITION BY GroupName ORDER BY Good DESC, YM) AS rn FROM S",
+        ")",
+        "SELECT GroupName, YM, Good FROM R WHERE rn = 1;"
+      ],
+      "check": {
+        "names": true
+      }
+    },
+    {
+      "id": "tr5-3",
+      "level": 5,
+      "title": "ABC по группам",
+      "tags": [
+        "окна"
+      ],
+      "text": "По заказам, отгруженным в 2026 году, выведите для каждой группы выручку `Revenue`, её долю `SharePct` и накопленную долю `CumPct` при сортировке групп по убыванию выручки (все — `DECIMAL`, доли — `DECIMAL(5,2)`). Сортировка результата — по убыванию выручки.",
+      "solution": [
+        "WITH R AS (",
+        "    SELECT g.GroupName, SUM(ol.Qty * ol.Price * (1 - o.DiscountPct / 100)) AS Revenue",
+        "    FROM Orders o",
+        "    JOIN OrderLines ol ON ol.OrderID = o.OrderID",
+        "    JOIN Products p ON p.ProductID = ol.ProductID",
+        "    JOIN ProductGroups g ON g.GroupID = p.GroupID",
+        "    WHERE o.Status = N'Отгружен' AND o.ShipDate >= '20260101' AND o.ShipDate < '20270101'",
+        "    GROUP BY g.GroupName",
+        ")",
+        "SELECT GroupName, CAST(Revenue AS DECIMAL(18,2)) AS Revenue,",
+        "       CAST(100.0 * Revenue / SUM(Revenue) OVER () AS DECIMAL(5,2)) AS SharePct,",
+        "       CAST(100.0 * SUM(Revenue) OVER (ORDER BY Revenue DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) / SUM(Revenue) OVER () AS DECIMAL(5,2)) AS CumPct",
+        "FROM R",
+        "ORDER BY Revenue DESC;"
+      ],
+      "check": {
+        "names": true,
+        "ordered": true
+      }
+    },
+    {
+      "id": "tr5-4",
+      "level": 5,
+      "title": "Интервал между заказами",
+      "tags": [
+        "LAG"
+      ],
+      "text": "Для заказчиков с 30 и более заказами выведите каждый их заказ, кроме первого: `CustomerName`, `OrderID`, `OrderDate` и число дней с предыдущего заказа `DaysSincePrev` (порядок заказов — по дате, затем по номеру).",
+      "solution": [
+        "WITH C AS (SELECT CustomerID FROM Orders GROUP BY CustomerID HAVING COUNT(*) >= 30),",
+        "L AS (",
+        "    SELECT o.CustomerID, o.OrderID, o.OrderDate,",
+        "           LAG(o.OrderDate) OVER (PARTITION BY o.CustomerID ORDER BY o.OrderDate, o.OrderID) AS PrevDate",
+        "    FROM Orders o JOIN C ON C.CustomerID = o.CustomerID",
+        ")",
+        "SELECT cu.CustomerName, L.OrderID, L.OrderDate, DATEDIFF(day, L.PrevDate, L.OrderDate) AS DaysSincePrev",
+        "FROM L JOIN Customers cu ON cu.CustomerID = L.CustomerID",
+        "WHERE L.PrevDate IS NOT NULL;"
+      ],
+      "check": {
+        "names": true
+      }
+    }
+  ]
+}
