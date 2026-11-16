@@ -28,12 +28,12 @@ async def scenario(browser, url, tag, errors):
     assert {'bank', 'shop', 'sewing', 'cargo'} <= set(packs), f'{tag}: не все базы загружены: {packs}'
     await pg.goto(url + '#/t/t1-01'); await pg.wait_for_timeout(500)
     sol = await pg.evaluate("App.trainerTasks().filter(t => t.id === 't1-01')[0].solution")
-    await pg.locator('textarea.ed-ta').first.fill(sol); await pg.get_by_text('✓ Проверить').click(); await pg.wait_for_timeout(500)
+    await pg.locator('textarea.ed-ta').first.fill(sol); await pg.locator('.task-btns .btn.primary').first.click(); await pg.wait_for_timeout(500)
     fb = await pg.inner_text('.task-fb')
     assert 'Отлично' in fb or 'Верно' in fb, f'{tag}: задача не засчитана: {fb[:80]}'
     await pg.goto(url + '#/sandbox/sewing'); await pg.wait_for_timeout(500)
     await pg.locator('textarea.ed-ta').first.fill("USE Cargo;\nSELECT COUNT(*) AS N FROM Shipments;")
-    await pg.get_by_text('▶ Выполнить').first.click(); await pg.wait_for_timeout(600)
+    await pg.locator('.task-btns .btn.primary').first.click(); await pg.wait_for_timeout(600)
     xp = await pg.evaluate("App.user.xp")
     await pg.reload(); await pg.wait_for_timeout(1200)
     await pg.locator('.continue-btn').click(); await pg.wait_for_timeout(1000)

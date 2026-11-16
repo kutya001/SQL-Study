@@ -37,9 +37,9 @@
   U.qs = function (s, r) { return (r || document).querySelector(s); };
   U.qsa = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
 
-  U.toast = function (msg, kind, ms) {
+  U.toast = function (msg, kind, ms, icon) {
     var box = U.qs('#toasts') || document.body.appendChild(U.h('div#toasts'));
-    var t = U.h('div.toast' + (kind ? '.' + kind : ''), { html: msg });
+    var t = U.h('div.toast' + (kind ? '.' + kind : ''), icon && G.Icon ? U.h('span.ach-ic', G.Icon(icon, 20)) : null, U.h('div.t-msg', { html: msg }));
     box.appendChild(t);
     setTimeout(function () { t.classList.add('show'); }, 10);
     setTimeout(function () { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 400); }, ms || 3200);
@@ -54,7 +54,7 @@
     (buttons || [{ text: 'Закрыть' }]).forEach(function (b) {
       foot.appendChild(U.h('button.btn' + (b.primary ? '.primary' : '') + (b.danger ? '.danger' : ''), { onclick: function () { var r = b.onclick ? b.onclick(close) : null; if (r !== false) close(); } }, b.text));
     });
-    var box = U.h('div.modal', U.h('div.modal-head', U.h('h3', title), U.h('button.icon-btn', { onclick: close, title: 'Закрыть', html: '&times;' })), U.h('div.modal-body', body), foot);
+    var box = U.h('div.modal', U.h('div.modal-head', U.h('h3', title), U.h('button.icon-btn', { onclick: close, title: 'Закрыть', 'aria-label': 'Закрыть' }, G.Icon ? G.Icon('x') : '×')), U.h('div.modal-body', body), foot);
     ov.appendChild(box);
     ov.addEventListener('mousedown', function (e) { if (e.target === ov) close(); });
     document.body.appendChild(ov);
@@ -64,6 +64,34 @@
     return new Promise(function (res) {
       U.modal(title, U.h('p', { html: text }), [{ text: 'Отмена', onclick: function () { res(false); } }, { text: okText || 'Да', primary: true, onclick: function () { res(true); } }]);
     });
+  };
+
+  // «Подробнее»: кнопка и плавно раскрывающийся блок (контент создаётся при первом открытии, если передана функция)
+  U.more = function (label, content, open) {
+    var body = U.h('div.more-in'), filled = false;
+    function fill() { if (filled) return; filled = true; var c = typeof content === 'function' ? content() : content; if (c) body.appendChild(c.nodeType ? c : U.h('div', c)); }
+    var labels = Array.isArray(label) ? label : [label || 'Подробнее', 'Скрыть'];
+    var txt = U.h('span', labels[0]);
+    var btn = U.h('button.more-btn', { type: 'button', 'aria-expanded': 'false' }, txt, G.Icon ? G.Icon('chevron-down', 16) : '');
+    var box = U.h('div.more', btn, U.h('div.more-body', body));
+    btn.addEventListener('click', function () {
+      var on = !box.classList.contains('open');
+      if (on) fill();
+      box.classList.toggle('open', on);
+      btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+      txt.textContent = on ? labels[1] : labels[0];
+    });
+    if (open) { fill(); box.classList.add('open'); txt.textContent = labels[1]; }
+    return box;
+  };
+  // Кнопка «i»: подробности в окне (на телефоне — шторка снизу)
+  U.info = function (title, content) {
+    return U.h('button.icon-btn.info-btn', { type: 'button', title: title, 'aria-label': title, onclick: function () { U.modal(title, typeof content === 'function' ? content() : content); } }, G.Icon ? G.Icon('info', 19) : 'i');
+  };
+  // Заметка с значком: U.note('ok'|'warn'|'', 'shield', ...дети)
+  U.note = function (kind, icon) {
+    var kids = Array.prototype.slice.call(arguments, 2);
+    return U.h('div.store-note' + (kind ? '.' + kind : ''), G.Icon ? G.Icon(icon || 'info', 18) : null, U.h('div.sn-body', kids));
   };
 
   U.plural = function (n, one, few, many) {

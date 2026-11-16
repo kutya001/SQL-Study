@@ -3,6 +3,7 @@
    ============================================================ */
 (function (G) {
   'use strict';
+  var I = G.Icon;
   var U = G.U, h = U.h, A = G.App, P = G.Packs, PF = G.PackFormat, S = G.Store;
 
   async function reload(msg, rereadBundle) {
@@ -122,14 +123,20 @@
       h('p', 'В файле все загруженные сейчас учебные базы (' + b.count + '). Положите его в папку ', h('code', 'schemas'), ' внутри папки курса (заменив старый) — тогда базы будут подключаться автоматически на любом ПК, даже там, где браузер не даёт доступ к папке.'),
       h('p.muted', 'Если папка курса подключена с записью, курс обновляет этот файл сам при каждом входе и нажатии «Обновить».')));
   }
+  function note(kind) {
+    var parts = Array.prototype.slice.call(arguments, 1);
+    var head = kind === 'ok' ? 'Учебные базы загружены' : 'Учебные базы: проверьте источник';
+    if (kind === 'bundle') { kind = 'ok'; head = 'Учебные базы загружены из schemas/index.js'; }
+    return U.note(kind, kind === 'ok' ? 'database' : 'alert', head, U.more('Подробнее', h('div.small', parts)));
+  }
   function sourceNote() {
     var bi = P.bundleInfo;
-    if (S.hosted) return h('div.store-note.ok', 'Курс открыт с сайта: учебные базы загружаются с него (файл ', h('code', 'schemas/index.js'), (bi ? ', собран ' + U.fmtDate(bi.built) : ''), '). Свою базу можно подключить кнопкой «Добавить базу» — она сохранится ' + (S.mode === 'fs' ? 'в выбранной папке' : 'в этом браузере') + '. Чтобы база появилась у всех, её добавляют в репозиторий курса (см. README).');
+    if (S.hosted) return note('ok', 'Курс открыт с сайта: учебные базы загружаются с него (файл ', h('code', 'schemas/index.js'), (bi ? ', собран ' + U.fmtDate(bi.built) : ''), '). Свою базу можно подключить кнопкой «Добавить базу» — она сохранится ' + (S.mode === 'fs' ? 'в выбранной папке' : 'в этом браузере') + '. Чтобы база появилась у всех, её добавляют в репозиторий курса (см. README).');
     var biText = bi ? 'файл schemas/index.js собран ' + U.fmtDate(bi.built) + ', баз в нём: ' + bi.count : 'файла schemas/index.js нет';
-    if (P.from === 'folder' && S.mode === 'fs') return h('div.store-note.ok', 'Базы читаются прямо из папки ', h('code', (S.folderName() || '') + '/schemas'), '. Для компьютеров без доступа к папке курс сам обновляет файл ', h('code', 'schemas/index.js'), P.bundleWritten ? ' — только что обновлён (' + P.bundleWritten + ' ' + U.plural(P.bundleWritten, 'база', 'базы', 'баз') + ').' : ' — он актуален.');
-    if (P.from === 'folder') return h('div.store-note.warn', 'Базы читаются из папки (только чтение). Файл ', h('code', 'schemas/index.js'), ' отсюда обновить нельзя: если добавили базу, нажмите «Скачать index.js» и положите файл в schemas. Сейчас: ' + biText + '.');
-    if (P.from === 'bundle') return h('div.store-note.warn', 'Папка курса не подключена, поэтому базы загружены из файла ', h('code', 'schemas/index.js'), ' (' + biText.replace('файл schemas/index.js ', '') + '). Если новой базы нет в списке — пересоберите файл: он обновляется сам на ПК, где папка курса подключена с записью; или нажмите «Добавить базу (папка)», выберите папку schemas целиком и затем «Скачать index.js».');
-    return h('div.store-note.warn', 'Папка курса не подключена и ' + biText + '. Добавьте базы кнопкой «Добавить базу (папка)» — можно выбрать сразу всю папку schemas.');
+    if (P.from === 'folder' && S.mode === 'fs') return note('ok', 'Базы читаются прямо из папки ', h('code', (S.folderName() || '') + '/schemas'), '. Для компьютеров без доступа к папке курс сам обновляет файл ', h('code', 'schemas/index.js'), P.bundleWritten ? ' — только что обновлён (' + P.bundleWritten + ' ' + U.plural(P.bundleWritten, 'база', 'базы', 'баз') + ').' : ' — он актуален.');
+    if (P.from === 'folder') return note('warn', 'Базы читаются из папки (только чтение). Файл ', h('code', 'schemas/index.js'), ' отсюда обновить нельзя: если добавили базу, нажмите «Скачать index.js» и положите файл в schemas. Сейчас: ' + biText + '.');
+    if (P.from === 'bundle') return note('bundle', 'Папка курса не подключена, поэтому базы загружены из файла ', h('code', 'schemas/index.js'), ' (' + biText.replace('файл schemas/index.js ', '') + '). Если новой базы нет в списке — пересоберите файл: он обновляется сам на ПК, где папка курса подключена с записью; или нажмите «Добавить базу (папка)», выберите папку schemas целиком и затем «Скачать index.js».');
+    return note('warn', 'Папка курса не подключена и ' + biText + '. Добавьте базы кнопкой «Добавить базу (папка)» — можно выбрать сразу всю папку schemas.');
   }
 
   A.route(/^#\/packs$/, function (view) {
@@ -144,12 +151,17 @@
     fileInp.addEventListener('change', async function () { var f = fileInp.files[0]; fileInp.value = ''; if (!f) return; await addPicked(f.name.replace(/\.json$/i, ''), { 'schema.json': await f.text() }); });
     page.appendChild(h('div.card-head', h('h1', 'Учебные базы'),
       h('div.row-btns',
-        h('button.btn', { onclick: function () { reload('Список баз обновлён', true); }, title: S.dir ? 'Перечитать папку schemas' : 'Перечитать файл schemas/index.js' }, '⟳ Обновить'),
-        h('button.btn.primary', { onclick: function () { dirInp.click(); }, title: 'Папка одной базы или вся папка schemas' }, '+ Добавить базу (папка)'),
-        h('button.btn', { onclick: function () { fileInp.click(); } }, '+ Из файла .json'),
-        h('button.btn', { onclick: downloadBundle, title: 'Собрать все базы в один файл schemas/index.js' }, '⬇ Скачать index.js'), dirInp, fileInp)));
+        h('button.icon-btn', { onclick: function () { reload('Список баз обновлён', true); }, title: S.dir ? 'Обновить: перечитать папку schemas' : 'Обновить: перечитать schemas/index.js', 'aria-label': 'Обновить' }, I('refresh')),
+        h('button.btn.primary', { onclick: function () { dirInp.click(); }, title: 'Папка одной базы или вся папка schemas' }, I('plus', 18), 'Добавить базу'),
+        h('button.icon-btn', { title: 'Ещё', 'aria-label': 'Ещё', onclick: moreMenu }, I('more')), dirInp, fileInp)));
+    function moreMenu() {
+      var m = U.modal('Учебные базы', h('div.menu-list',
+        h('button.menu-item', { onclick: function () { m.close(); fileInp.click(); } }, I('upload'), h('span', h('b', 'Добавить из файла .json'), h('small', 'база одним файлом'))),
+        h('button.menu-item', { onclick: function () { m.close(); downloadBundle(); } }, I('download'), h('span', h('b', 'Скачать index.js'), h('small', 'все базы одним файлом — для компьютеров без доступа к папке'))),
+        h('button.menu-item', { onclick: function () { m.close(); reload('Список баз обновлён', true); } }, I('refresh'), h('span', h('b', 'Обновить список'), h('small', S.dir ? 'перечитать папку schemas' : 'перечитать schemas/index.js')))));
+    }
     page.appendChild(sourceNote());
-    page.appendChild(h('p.muted', 'Отметьте базы, которые хотите изучать — одну или несколько. Их модули и практикумы появятся на главной, задачи — в тренажёре, а таблицы — в песочнице и на схеме. В песочнице к любой подключённой базе можно обратиться по полному имени: ', h('code', 'ИмяБазы.dbo.Таблица'), ', или переключиться командой ', h('code', 'USE ИмяБазы;'), '.'));
+    page.appendChild(h('div.intro-row', h('p.muted.small', 'Отметьте базы, которые изучаете.'), U.info('Что дают учебные базы', function () { return h('p', 'Отметьте базы, которые хотите изучать — одну или несколько. Их модули и практикумы появятся на главной, задачи — в тренажёре, а таблицы — в песочнице и на схеме. В песочнице к любой подключённой базе можно обратиться по полному имени: ', h('code', 'ИмяБазы.dbo.Таблица'), ', или переключиться командой ', h('code', 'USE ИмяБазы;'), '.'); })));
     var active = P.activeIds(u);
     P.all().forEach(function (p) {
       var cnt = PF.counts(p), on = active.indexOf(p.id) >= 0;
@@ -167,18 +179,18 @@
       if (cnt.trainer) stats.push('тренажёр: ' + cnt.trainer);
       if (cnt.examples) stats.push('примеров: ' + cnt.examples);
       card.appendChild(h('div.pc-top',
-        h('span.pack-ic.big', p.icon),
+        I.pack(p, 'lg'),
         h('div.pc-main', h('h3', p.title, h('span.badge', p.dbName)), h('div.muted.small', sourceText(p) + (p.author ? ' · автор: ' + p.author : '') + (p.version ? ' · версия ' + p.version : ''))),
         h('label.switch', cb, h('span', 'Изучаю'))));
-      if (p.description) card.appendChild(A.richHtml(p.description));
+      if (p.description) card.appendChild(U.more(['Описание базы', 'Скрыть описание'], function () { return A.richHtml(p.description); }));
       card.appendChild(h('div.pc-stats', stats.map(function (x) { return h('span.tag', x); })));
       if (p.errors.length) card.appendChild(h('div.fb.bad.small', h('b', 'Ошибок при загрузке: ' + p.errors.length + '. '), p.errors.slice(0, 3).map(function (e) { return h('div', e.where + ': ' + e.msg); }), p.errors.length > 3 ? h('div', '…') : null));
       else if (p.warnings.length) card.appendChild(h('div.muted.small', 'Замечаний: ' + p.warnings.length + ' — нажмите «Проверить», чтобы посмотреть.'));
       card.appendChild(h('div.row-btns',
-        h('a.btn.small', { href: '#/schema/' + p.id }, 'Схема'),
-        h('a.btn.small', { href: '#/sandbox/' + p.id }, 'Песочница'),
-        cnt.trainer ? h('a.btn.small', { href: '#/trainer/0/' + p.id }, 'Тренажёр') : null,
-        h('button.btn.small.ghost', { onclick: function () { A.showPackReport(p); } }, 'Проверить задания'),
+        h('a.btn.small', { href: '#/schema/' + p.id }, I('schema', 16), 'Схема'),
+        h('a.btn.small', { href: '#/sandbox/' + p.id }, I('terminal', 16), 'Песочница'),
+        cnt.trainer ? h('a.btn.small', { href: '#/trainer/0/' + p.id }, I('target', 16), 'Тренажёр') : null,
+        h('button.btn.small.ghost', { onclick: function () { A.showPackReport(p); } }, I('check-circle', 16), 'Проверить'),
         p.source === 'import' && S.mode === 'fs' ? h('button.btn.small.ghost', {
           onclick: async function () { try { await S.writePack(p.localName, p.rawFiles); await S.removeLocalPack(p.localName); await reload('База скопирована в папку schemas/' + U.esc(p.localName)); } catch (e) { U.toast('Не удалось: ' + U.esc(e.message), 'err'); } }
         }, 'Перенести в папку курса') : null,
@@ -191,11 +203,10 @@
       page.appendChild(h('div.card.pad.err-card', h('h3', 'Не удалось загрузить'),
         h('ul.rep-list', P.failed.map(function (f) { return h('li', h('b', f.name + ': '), f.msg); }))));
     }
-    page.appendChild(h('div.card.pad', h('h3', 'Как добавить свою базу'),
-      h('ol.steps-list',
+    page.appendChild(h('div.card.pad', h('div.card-head', h('h3', 'Как добавить свою базу'), I('help', 20)), U.more('Показать шаги', h('ol.steps-list',
         h('li', 'Подготовьте папку базы: ', h('code', 'schema.json'), ' (таблицы и столбцы), ', h('code', 'data/ИмяТаблицы.csv'), ' (данные) и, по желанию, ', h('code', 'tasks.json'), ' (практикум), ', h('code', 'trainer.json'), ' (тренажёр), ', h('code', 'examples.json'), ' (примеры для песочницы), ', h('code', 'course.json'), ' (уроки). Образец — папка ', h('code', 'schemas/_шаблон'), ', полное описание — ', h('code', 'schemas/ФОРМАТ.md'), '.'),
         h('li', S.readonly && S.dir ? ['Папка курса подключена только для чтения: базы из ', h('code', S.folderName() + '/schemas/'), ' загружаются, но записать туда новую базу курс не может. Скопируйте папку базы в schemas вручную (в Проводнике) и нажмите «Обновить» — или нажмите «Добавить базу», тогда она сохранится только в этом браузере.'] : S.mode === 'fs' ? ['Скопируйте папку в ', h('code', (S.folderName() || 'папка курса') + '/schemas/'), ' и нажмите «Обновить» — или нажмите «Добавить базу» и выберите папку: курс сам скопирует её в schemas. База станет доступна всем, кто работает с этой папкой курса.'] : ['Нажмите «Добавить базу» и выберите папку базы. Она сохранится в этом браузере. Чтобы база была у всей группы, подключите папку курса (Chrome/Edge) и положите базу в ', h('code', 'schemas/'), '.']),
         h('li', 'Нажмите «Проверить задания» у новой базы: курс выполнит все эталоны и покажет ошибки.'),
-        h('li', 'Чтобы база подключалась сама на компьютерах, где браузер не даёт доступ к папке, она должна попасть в файл ', h('code', 'schemas/index.js'), '. Его курс обновляет автоматически на любом ПК, где папка подключена с записью. Если такого ПК нет — нажмите «⬇ Скачать index.js» и положите файл в ', h('code', 'schemas'), ' вместо старого.'))));
+        h('li', 'Чтобы база подключалась сама на компьютерах, где браузер не даёт доступ к папке, она должна попасть в файл ', h('code', 'schemas/index.js'), '. Его курс обновляет автоматически на любом ПК, где папка подключена с записью. Если такого ПК нет — нажмите «Ещё» → «Скачать index.js» и положите файл в ', h('code', 'schemas'), ' вместо старого.')))));
   });
 })(window);

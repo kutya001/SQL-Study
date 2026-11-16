@@ -35,12 +35,12 @@
     tables.forEach(function (t, i) {
       var p = lay[t.name] || [i % ncol, Math.floor(i / ncol)];
       var b = h('div.erd-t', { style: { gridColumn: (p[0] + 1), gridRow: (p[1] + 1) } },
-        h('div.erd-h', h('b', t.name), h('button.icon-btn.small', { title: 'Показать данные', onclick: function () { var pv = A.tablePreview(pack, t.name); U.modal(pv.title, pv.table); } }, '▤')),
+        h('div.erd-h', h('b', t.name), h('button.icon-btn.small', { title: 'Показать данные', onclick: function () { var pv = A.tablePreview(pack, t.name); U.modal(pv.title, pv.table); } }, G.Icon('table', 16))),
         h('div.erd-sub', (t.title || '') + (t.rowCount !== undefined ? ' · ' + t.rowCount + ' стр.' : '')));
       t.cols.forEach(function (c) {
         var key = (t.name + '.' + c[0]).toLowerCase();
         var pk = isPk(pack, t, c[0]), fk = !!fks[key];
-        b.appendChild(h('div.erd-c' + (pk ? '.pk' : '') + (fk ? '.fk' : ''), { 'data-k': key, title: c[2] + (fk ? ' → ' + fks[key] : '') }, h('span', (pk ? '🔑 ' : fk ? '↗ ' : '') + c[0]), h('span.muted', c[1])));
+        b.appendChild(h('div.erd-c' + (pk ? '.pk' : '') + (fk ? '.fk' : ''), { 'data-k': key, title: c[2] + (fk ? ' → ' + fks[key] : '') }, h('span.erd-cn', pk ? G.Icon('key', 13) : fk ? G.Icon('link', 13) : null, c[0]), h('span.muted', c[1])));
       });
       wrap.appendChild(b);
     });
@@ -69,6 +69,17 @@
     return { el: wrap, draw: draw };
   };
   // Схема связей в большом окне — не уходя со страницы задания
+  // Схема базы в шторке снизу (телефон): нажатие на имя вставляет его в запрос
+  A.schemaSheet = function (pack, onPick) {
+    var m;
+    var panel = G.SchemaPanel.create(pack, {
+      onPick: function (text) { onPick(text); U.toast('Вставлено: <b>' + U.esc(text) + '</b>', 'ok', 1200); },
+      onPreview: function (name) { var pv = A.tablePreview(pack, name); m.close(); U.modal(pv.title, pv.table); }
+    });
+    panel.el.classList.add('sp-sheet');
+    m = U.modal('Схема базы ' + pack.dbName, panel.el, [{ text: 'Готово', primary: true }]);
+    return m;
+  };
   A.showErd = function (pack) {
     var e = A.erd(pack);
     var md = U.modal('Схема базы ' + pack.dbName + ': ' + pack.title, h('div.erd-modal', e.el));
@@ -89,10 +100,10 @@
     var box = h('div.sp');
     var search = h('input.inp.sp-search', { type: 'search', placeholder: 'Найти таблицу или столбец…' });
     box.appendChild(h('div.sp-head',
-      h('div.sp-title', h('span', pack.icon || '🗄️'), ' ', opts.title || ('Схема базы ' + pack.dbName)),
-      h('button.btn.small.ghost', { title: 'Схема связей между таблицами', onclick: function () { A.showErd(pack); } }, 'Связи ⤢')));
+      h('div.sp-title', G.Icon.pack(pack, 'sm'), h('span', opts.title || pack.dbName)),
+      h('button.btn.small.ghost', { title: 'Схема связей между таблицами', onclick: function () { A.showErd(pack); } }, G.Icon('expand', 15), 'Связи')));
     box.appendChild(search);
-    box.appendChild(h('div.sp-hint', 'Щелчок по имени — вставить в запрос, ▤ — посмотреть данные'));
+    box.appendChild(h('div.sp-hint', 'Нажмите на имя — оно вставится в запрос'));
     var list = h('div.sp-list');
     box.appendChild(list);
     var blocks = {};
@@ -115,13 +126,13 @@
       d.appendChild(h('summary',
         h('span.sp-tn', { title: 'Вставить имя таблицы', onclick: function (e) { e.preventDefault(); e.stopPropagation(); pick(t.name); } }, t.name),
         h('span.sp-cnt', t.rowCount !== undefined ? String(t.rowCount) : ''),
-        h('button.icon-btn.small.sp-pv', { title: 'Первые 20 строк', onclick: function (e) { e.preventDefault(); e.stopPropagation(); preview(t.name); } }, '▤')));
+        h('button.icon-btn.small.sp-pv', { title: 'Первые 20 строк', onclick: function (e) { e.preventDefault(); e.stopPropagation(); preview(t.name); } }, G.Icon('table', 16))));
       if (t.title) d.appendChild(h('div.sp-tt', t.title));
       t.cols.forEach(function (c) {
         var key = (t.name + '.' + c[0]).toLowerCase(), fk = fks[key], pk = isPk(pack, t, c[0]);
         var row = h('div.sp-c', { title: c[2] + (fk ? '\nСсылается на ' + fk : '') },
           h('div.sp-c1',
-            h('span.sp-cn' + (pk ? '.pk' : '') + (fk ? '.fk' : ''), { onclick: function () { pick(c[0]); } }, (pk ? '🔑 ' : '') + c[0]),
+            h('span.sp-cn' + (pk ? '.pk' : '') + (fk ? '.fk' : ''), { onclick: function () { pick(c[0]); } }, pk ? G.Icon('key', 12) : null, c[0]),
             h('span.sp-ct', c[1])),
           c[2] || fk ? h('div.sp-cd', fk ? h('a', { href: '#', onclick: function (e) { e.preventDefault(); focusTable(fk.split('.')[0]); } }, '→ ' + fk) : null, fk && c[2] ? ' · ' : null, c[2] || '') : null);
         row.setAttribute('data-s', (c[0] + ' ' + (c[2] || '')).toLowerCase());

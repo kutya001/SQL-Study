@@ -219,7 +219,7 @@
       if (ok) {
         u.ach[a.id] = new Date().toISOString();
         A.log('Достижение: ' + a.title);
-        setTimeout(function () { U.toast('<span class="ach-ic">' + a.icon + '</span> Достижение: <b>' + U.esc(a.title) + '</b><br><small>' + U.esc(a.desc) + '</small>', 'ach', 5200); }, 400);
+        setTimeout(function () { U.toast('Достижение: <b>' + U.esc(a.title) + '</b><br><small>' + U.esc(a.desc) + '</small>', 'ach', 5200, G.Icon.achName(a.id)); }, 400);
       }
     });
   };
@@ -241,35 +241,152 @@
   };
 
   /* ---------------- Верхняя панель ---------------- */
+  /* ================= Оболочка: боковая панель, верхняя и нижняя панели ================= */
+  var I = G.Icon;
+  var NAV = [
+    { href: '#/home', title: 'Курс', icon: 'course', re: /^#\/(home|m|l|hw|set)\b/ },
+    { href: '#/trainer', title: 'Тренажёр', icon: 'target', re: /^#\/(trainer|t)\b/ },
+    { href: '#/sandbox', title: 'Песочница', icon: 'terminal', re: /^#\/sandbox\b/ },
+    { href: '#/schema', title: 'Схема', icon: 'schema', re: /^#\/schema\b/ },
+    { href: '#/packs', title: 'Базы', icon: 'database', re: /^#\/packs\b/ },
+    { href: '#/cheat', title: 'Справочник', icon: 'book', re: /^#\/cheat\b/ }
+  ];
+  var NAV2 = [
+    { href: '#/ach', title: 'Достижения', icon: 'trophy', re: /^#\/ach\b/ },
+    { href: '#/team', title: 'Сводка по группе', icon: 'users', re: /^#\/team\b/ },
+    { href: '#/profile', title: 'Профиль', icon: 'user', re: /^#\/profile\b/ }
+  ];
+  var TABS = [
+    { href: '#/home', title: 'Курс', icon: 'course', re: NAV[0].re },
+    { href: '#/trainer', title: 'Тренажёр', icon: 'target', re: NAV[1].re },
+    { href: '#/sandbox', title: 'Песочница', icon: 'terminal', re: NAV[2].re },
+    { href: '#/packs', title: 'Базы', icon: 'database', re: NAV[4].re },
+    { href: '#/profile', title: 'Профиль', icon: 'user', re: NAV2[2].re }
+  ];
+  function isMobile() { return window.innerWidth < 1024; }
+  function initials(name) { var p = String(name || '?').trim().split(/\s+/); return ((p[0] || '?').charAt(0) + (p[1] ? p[1].charAt(0) : '')).toUpperCase(); }
+  A.initials = initials;
+  A.section = function (route) {
+    route = route || location.hash || '#/home';
+    var all = NAV.concat(NAV2);
+    for (var i = 0; i < all.length; i++) if (all[i].re.test(route)) return all[i];
+    return null;
+  };
+  A.openDrawer = function () { document.body.classList.add('drawer-open'); };
+  A.closeDrawer = function () { document.body.classList.remove('drawer-open'); };
+  A.toggleSide = function () {
+    if (isMobile()) { document.body.classList.toggle('drawer-open'); return; }
+    var mini = !document.body.classList.contains('side-mini');
+    document.body.classList.toggle('side-mini', mini);
+    try { localStorage.setItem('sqlkurs.side', mini ? 'mini' : 'full'); } catch (e) { }
+  };
+  A.toggleTheme = function () {
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    var t = cur === 'dark' ? 'light' : 'dark';
+    if (A.user) { A.user.settings.theme = t; A.save(); }
+    try { localStorage.setItem('sqlkurs.theme', t); } catch (e) { }
+    A.applyTheme(); A.renderTop();
+  };
+  function navItem(x, route, cls) {
+    var active = x.re.test(route);
+    return h('a.' + (cls || 'nav-item') + (active ? '.active' : ''), { href: x.href, title: x.title, 'aria-current': active ? 'page' : null },
+      h('span.ni-ic', I(x.icon, 20)), h('span.ni-t', x.title));
+  }
+
   A.renderTop = function () {
-    var top = U.qs('#topbar');
+    var top = U.qs('#topbar'), side = U.qs('#side'), tabs = U.qs('#tabbar');
     if (!top) return;
-    U.clear(top);
+    U.clear(top); if (side) U.clear(side); if (tabs) U.clear(tabs);
+    document.body.classList.toggle('has-user', !!A.user);
     if (!A.user) { top.style.display = 'none'; return; }
     top.style.display = '';
-    var r = A.rank(A.user.xp);
-    var pct = r.next ? Math.round((A.user.xp - r.from) * 100 / (r.next - r.from)) : 100;
+    var u = A.user, r = A.rank(u.xp);
+    var pct = r.next ? Math.round((u.xp - r.from) * 100 / (r.next - r.from)) : 100;
     var route = location.hash || '#/home';
-    var nav = [['#/home', 'Курс'], ['#/trainer', 'Тренажёр'], ['#/sandbox', 'Песочница'], ['#/schema', 'Схема'], ['#/packs', 'Базы'], ['#/cheat', 'Справочник']];
-    top.appendChild(h('a.brand', { href: '#/home' }, h('span.brand-mark', 'SELECT'), h('span.brand-t', 'курс SQL для аналитиков')));
-    var n = h('nav.topnav');
-    nav.forEach(function (x) {
-      var active = route.indexOf(x[0]) === 0 || (x[0] === '#/home' && /^#\/(m|l|hw|set)\//.test(route)) || (x[0] === '#/trainer' && /^#\/t\//.test(route));
-      n.appendChild(h('a' + (active ? '.active' : ''), { href: x[0] }, x[1]));
-    });
-    top.appendChild(n);
-    top.appendChild(h('div.top-right',
-      h('div.streak', { title: 'Дней подряд с занятиями' }, h('span.fire', '🔥'), String(A.user.streak.days)),
-      h('a.userchip', { href: '#/profile', title: 'Профиль' },
-        h('div.uc-name', A.user.name),
-        h('div.uc-rank', r.name + ' · ' + A.user.xp + ' XP'),
-        h('div.uc-bar', h('div', { style: { width: pct + '%' } })))));
+    var sec = A.section(route);
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    // --- левая панель (на телефоне — выдвижное меню)
+    if (side) {
+      side.appendChild(h('div.side-head',
+        h('a.brand', { href: '#/home', title: 'SELECT с нуля' }, h('span.logo', I('database', 20)), h('span.brand-txt', h('b', 'SELECT с нуля'), h('small', 'курс SQL для аналитиков'))),
+        h('button.icon-btn.side-close', { title: 'Закрыть меню', 'aria-label': 'Закрыть меню', onclick: A.closeDrawer }, I('x'))));
+      side.appendChild(h('div.side-scroll',
+        h('div.side-cap', 'Учёба'),
+        h('nav.side-nav', NAV.slice(0, 3).map(function (x) { return navItem(x, route); })),
+        h('div.side-cap', 'Данные'),
+        h('nav.side-nav', NAV.slice(3).map(function (x) { return navItem(x, route); })),
+        h('div.side-cap', 'Вы'),
+        h('nav.side-nav', NAV2.map(function (x) { return navItem(x, route); }))));
+      side.appendChild(h('div.side-foot',
+        h('a.side-user', { href: '#/profile', title: 'Профиль' },
+          h('span.avatar', initials(u.name)),
+          h('span.su-main', h('span.su-name', u.name), h('span.su-rank', r.name + ' · ' + u.xp + ' XP'), h('span.su-bar', h('i', { style: { width: pct + '%' } })))),
+        h('div.side-actions',
+          h('button.icon-btn', { title: dark ? 'Светлая тема' : 'Тёмная тема', 'aria-label': 'Сменить тему', onclick: A.toggleTheme }, I(dark ? 'sun' : 'moon')),
+          h('button.icon-btn.side-collapse', { title: 'Свернуть панель', 'aria-label': 'Свернуть панель', onclick: A.toggleSide }, I('sidebar')),
+          h('button.icon-btn', { title: 'Сменить пользователя', 'aria-label': 'Выйти', onclick: function () { A.closeDrawer(); A.logout(); } }, I('logout')))));
+    }
+
+    // --- верхняя панель
+    top.appendChild(h('button.icon-btn.tb-menu', { title: 'Меню', 'aria-label': 'Меню', onclick: A.toggleSide }, I('menu', 22)));
+    top.appendChild(h('div.tb-title', sec ? h('span.tb-ic', I(sec.icon, 18)) : null, h('span.tb-sec', sec ? sec.title : 'SELECT с нуля')));
+    top.appendChild(h('div.tb-right',
+      h('span.pill.streak', { title: 'Дней подряд с занятиями' }, I('flame', 16), String(u.streak.days)),
+      h('span.pill.xp', { title: r.name + ': ' + u.xp + ' XP' + (r.next ? ' (до следующего ранга — ' + (r.next - u.xp) + ')' : '') }, I('star', 16), String(u.xp)),
+      h('button.icon-btn.tb-theme', { title: dark ? 'Светлая тема' : 'Тёмная тема', 'aria-label': 'Сменить тему', onclick: A.toggleTheme }, I(dark ? 'sun' : 'moon')),
+      h('a.tb-avatar', { href: '#/profile', title: u.name }, h('span.avatar.sm', initials(u.name)))));
+
+    // --- нижняя панель (телефон)
+    if (tabs) TABS.forEach(function (x) { tabs.appendChild(navItem(x, route, 'tab')); });
   };
+
+  // Поведение панелей: скрытие при прокрутке, клавиатура, жесты
+  (function () {
+    var lastY = 0, ticking = false;
+    window.addEventListener('scroll', function () {
+      if (ticking) return; ticking = true;
+      requestAnimationFrame(function () {
+        ticking = false;
+        var y = window.scrollY || 0, b = document.body.classList;
+        b.toggle('scrolled', y > 6);
+        if (isMobile() && !b.contains('drawer-open')) {
+          if (y > lastY + 6 && y > 90) b.add('bars-hidden');
+          else if (y < lastY - 6 || y < 40) b.remove('bars-hidden');
+        } else b.remove('bars-hidden');
+        lastY = y;
+      });
+    }, { passive: true });
+    document.addEventListener('focusin', function (e) {
+      if (isMobile() && e.target && /^(TEXTAREA|INPUT|SELECT)$/.test(e.target.tagName) && e.target.type !== 'checkbox' && e.target.type !== 'file') document.body.classList.add('kb-open');
+    });
+    document.addEventListener('focusout', function () { setTimeout(function () { var a = document.activeElement; if (!a || !/^(TEXTAREA|INPUT|SELECT)$/.test(a.tagName)) document.body.classList.remove('kb-open'); }, 120); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') A.closeDrawer(); });
+    document.addEventListener('click', function (e) {
+      if (e.target && e.target.id === 'scrim') A.closeDrawer();
+      var a = e.target && e.target.closest && e.target.closest('#side a');
+      if (a) A.closeDrawer();
+    });
+    var sx = null, sy = null;
+    document.addEventListener('touchstart', function (e) { var t = e.touches[0]; sx = t.clientX; sy = t.clientY; }, { passive: true });
+    document.addEventListener('touchend', function (e) {
+      if (sx === null || !isMobile()) return;
+      var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+      if (Math.abs(dx) > 70 && Math.abs(dy) < 50) {
+        if (dx < 0 && document.body.classList.contains('drawer-open')) A.closeDrawer();
+        else if (dx > 0 && sx < 24 && A.user) A.openDrawer();
+      }
+      sx = sy = null;
+    }, { passive: true });
+    try { if (localStorage.getItem('sqlkurs.side') === 'mini') document.body.classList.add('side-mini'); } catch (e) { }
+    window.addEventListener('resize', U.debounce(function () { if (!isMobile()) { A.closeDrawer(); document.body.classList.remove('bars-hidden', 'kb-open'); } }, 150));
+  })();
 
   /* ---------------- Тема ---------------- */
   A.applyTheme = function () {
     var t = (A.user && A.user.settings && A.user.settings.theme) || localStorage.getItem('sqlkurs.theme') || 'light';
     document.documentElement.setAttribute('data-theme', t);
+    var mc = document.querySelector('meta[name="theme-color"]'); if (mc) mc.setAttribute('content', t === 'dark' ? '#0b1020' : '#eef1f8');
   };
 
   /* ---------------- Маршрутизация ---------------- */
@@ -286,6 +403,7 @@
         U.clear(view);
         view.className = '';
         window.scrollTo(0, 0);
+        A.closeDrawer(); document.body.classList.remove('bars-hidden');
         try { routes[i][1].apply(null, [view].concat(m.slice(1))); }
         catch (e) { console.error(e); view.appendChild(h('div.page', h('div.err-box', 'Ошибка страницы: ' + e.message))); }
         if (A.user && hash !== '#/start') { A.user.last = hash; }
@@ -302,15 +420,17 @@
     view.className = 'start';
     var box = h('div.start-box');
     view.appendChild(box);
-    box.appendChild(h('div.start-logo', h('span.brand-mark.big', 'SELECT'), h('div', h('h1', C.title), h('p.muted', C.subtitle))));
+    box.appendChild(h('div.start-logo', h('span.logo', I('database', 30)), h('div', h('h1', C.title), h('p', 'Курс T-SQL для аналитиков: только SELECT, от первого запроса до оконных функций'))));
     var area = h('div.start-area'); box.appendChild(area);
     S.init().then(function (state) { drawStart(area, state); }).catch(function (e) { area.appendChild(h('div.err-box', 'Ошибка хранилища: ' + e.message)); });
   });
 
   function storageNote() {
-    if (S.mode === 'fs') return h('div.store-note.ok', 'Прогресс сохраняется в файлы: ', h('code', (S.folderName() || '') + '/progress/*.json'), ' ', h('a', { href: '#', onclick: function (e) { e.preventDefault(); changeFolder(); } }, 'сменить папку'));
-    if (S.readonly && S.dir) return h('div.store-note.warn', 'Папка «' + S.folderName() + '» подключена только для чтения: учебные базы из schemas загружаются, а прогресс хранится в памяти этого браузера. Делайте экспорт прогресса в профиле. ', h('a', { href: '#', onclick: function (e) { e.preventDefault(); S.resetMode(); A.dispatch(); } }, 'Подключить с записью'));
-    return h('div.store-note.ok', '🔒 Прогресс хранится в этом браузере и сохраняется автоматически после каждого действия — он остаётся после закрытия браузера. Иногда скачивайте копию в файл (кнопка в профиле) — на случай очистки браузера или перехода на другой компьютер. ', S.fsSupported ? h('a', { href: '#', onclick: function (e) { e.preventDefault(); S.resetMode(); A.dispatch(); } }, 'Хранить в папке курса') : null);
+    var link = function (text, fn) { return h('a', { href: '#', onclick: function (e) { e.preventDefault(); fn(); } }, text); };
+    if (S.mode === 'fs') return U.note('ok', 'folder', 'Прогресс — в файлах ', h('code', (S.folderName() || '') + '/progress'), ' · ', link('сменить папку', changeFolder));
+    if (S.readonly && S.dir) return U.note('warn', 'alert', 'Папка «' + S.folderName() + '» только для чтения — прогресс хранится в браузере. ', link('Подключить с записью', function () { S.resetMode(); A.dispatch(); }));
+    return U.note('ok', 'shield', 'Прогресс сохраняется в этом браузере автоматически.',
+      U.more('Подробнее', function () { return h('div.small', 'Каждое действие сразу записывается в две копии в браузере и остаётся после его закрытия. Для переноса на другой компьютер или на случай очистки браузера скачивайте копию в файл в профиле. ', S.fsSupported ? link('Хранить в папке', function () { S.resetMode(); A.dispatch(); }) : null); }));
   }
   async function changeFolder() {
     try { await S.pickFolder(); A.packsReady = P.load(); await A.packsReady; A.dispatch(); }
@@ -396,7 +516,7 @@
     else rows.push(['Учебные базы', P.from === 'folder' ? 'читаются из папки schemas' : P.from === 'bundle' ? 'из файла schemas/index.js (баз: ' + bi.count + ', собран ' + U.fmtDate(bi.built) + ')' : (bi ? 'файл schemas/index.js найден' : 'только встроенная — файла schemas/index.js нет'), P.from === 'folder' || P.from === 'bundle' || !!bi]);
     U.clear(body);
     var t = h('table.kv.diag-t');
-    rows.forEach(function (r) { t.appendChild(h('tr', h('td', r[0]), h('td', h('span.' + (r[2] === null ? 'muted' : r[2] ? 'ok-t' : 'bad-t'), r[2] === null ? '• ' : r[2] ? '✓ ' : '✗ '), r[1]))); });
+    rows.forEach(function (r) { t.appendChild(h('tr', h('td', r[0]), h('td', h('span.dg-mark.' + (r[2] === null ? 'muted' : r[2] ? 'ok-t' : 'bad-t'), I(r[2] === null ? 'info' : r[2] ? 'check-circle' : 'x-circle', 16), ' '), r[1]))); });
     body.appendChild(t);
     var tips = [];
     var rwBad = pk.readwrite && !pk.readwrite.ok && pk.readwrite.name === 'AbortError';
@@ -439,30 +559,25 @@
           redraw('ready');
         } catch (e) { pickFailed(e, redraw); }
       };
+      var opt = function (rec, icon, title, line, details, buttons) {
+        return h('div.sc-opt' + (rec ? '.rec' : ''), h('div.sc-ic', I(icon, 24)), h('h3', title), h('p', line), U.more('Подробнее', details), buttons);
+      };
       area.appendChild(h('div.card.pad',
-        h('h2', 'Где хранить ваш прогресс?'),
-        h('p.muted', 'Выбор запоминается — при следующем запуске курс откроется сразу. Поменять можно в любой момент.'),
+        h('h2', 'Где хранить прогресс?'),
+        h('p.muted', 'Выбор запоминается. Поменять можно в любой момент.'),
         h('div.store-choice',
-          h('div.sc-opt.rec',
-            h('div.sc-ic', '🌐'),
-            h('h3', 'В этом браузере'),
-            h('p', 'Работает на любом компьютере, даже если политика организации запрещает браузеру доступ к файлам. Прогресс сохраняется сам после каждого действия и не пропадает при закрытии браузера.'),
-            h('ul.sc-list', h('li', 'двойная запись: localStorage + IndexedDB'), h('li', 'история копий — можно откатиться'), h('li', 'копия в файл одной кнопкой')),
+          opt(true, 'globe', 'В этом браузере', 'Работает везде, даже при запретах организации.',
+            h('ul.sc-list', h('li', 'сохраняется сам после каждого действия'), h('li', 'две копии: localStorage и IndexedDB'), h('li', 'история снимков — можно откатиться'), h('li', 'копия в файл одной кнопкой')),
             h('button.btn.primary.lg', { onclick: function () { S.useLocal(); redraw('local'); } }, 'Хранить в браузере')),
-          S.hosted ? h('div.sc-opt',
-            h('div.sc-ic', '📁'),
-            h('h3', 'В папке на компьютере'),
-            h('p', 'Курс открыт с сайта. Можно хранить прогресс файлами ', h('code', 'progress/<логин>.json'), ' в любой папке — например, в общей папке группы на сетевом диске, чтобы преподаватель видел сводку. Нужен доступ браузера к папке.'),
-            h('ul.sc-list', h('li', 'выберите или создайте папку для прогресса'), h('li', 'браузер спросит разрешение — нажмите «Изменить файлы»')),
-            h('div.row-btns', h('button.btn.lg', { onclick: pickFolderBtn }, 'Выбрать папку'))) :
-          h('div.sc-opt',
-            h('div.sc-ic', '📁'),
-            h('h3', 'В папке курса'),
-            h('p', 'Файлы ', h('code', 'progress/<логин>.json'), ' рядом с курсом. Удобно, если папка лежит на общем диске и преподаватель смотрит сводку по группе. Нужен доступ браузера к папке.'),
-            h('ul.sc-list', h('li', 'выберите папку, где лежит index.html'), h('li', 'браузер спросит разрешение — нажмите «Изменить файлы»')),
-            h('div.row-btns',
-              h('button.btn.lg', { onclick: pickFolderBtn }, 'Выбрать папку курса'),
-              h('button.btn.ghost', { onclick: function () { pickRO(redraw); }, title: 'Если браузер запрещает изменять файлы: учебные базы из папки работают, прогресс — в браузере' }, 'Только для чтения')))),
+          S.hosted
+            ? opt(false, 'folder', 'В папке на компьютере', 'Файлы прогресса в любой папке, например общей папке группы.',
+              h('ul.sc-list', h('li', h('code', 'progress/<логин>.json'), ' в выбранной папке'), h('li', 'преподаватель видит сводку по группе'), h('li', 'браузер спросит разрешение — «Изменить файлы»')),
+              h('div.row-btns', h('button.btn.lg', { onclick: pickFolderBtn }, 'Выбрать папку')))
+            : opt(false, 'folder', 'В папке курса', 'Файлы рядом с курсом — удобно на общем диске.',
+              h('ul.sc-list', h('li', h('code', 'progress/<логин>.json'), ' рядом с index.html'), h('li', 'преподаватель видит сводку по группе'), h('li', 'браузер спросит разрешение — «Изменить файлы»'), h('li', 'если запись запрещена — «Только для чтения»: базы из папки, прогресс в браузере')),
+              h('div.row-btns',
+                h('button.btn.lg', { onclick: pickFolderBtn }, 'Выбрать папку'),
+                h('button.btn.ghost', { onclick: function () { pickRO(redraw); }, title: 'Учебные базы из папки, прогресс — в браузере' }, 'Только чтение')))),
         helpLink));
       return;
     }
@@ -486,23 +601,24 @@
     area.appendChild(usersBox);
     var restoreInp = h('input', { type: 'file', multiple: true, accept: '.json,application/json', style: { display: 'none' } });
     restoreInp.addEventListener('change', async function () { var fl = Array.prototype.slice.call(restoreInp.files); restoreInp.value = ''; if (fl.length) await restoreFromFiles(fl, function () { redraw(state); }); });
-    usersBox.appendChild(h('div.row-btns.small-gap', h('button.btn.small.ghost', { onclick: function () { restoreInp.click(); }, title: 'Загрузить файлы прогресса (.json), скачанные раньше. Можно выбрать несколько.' }, '⤒ Восстановить из файла'), restoreInp));
+    usersBox.appendChild(restoreInp);
     S.listUsers().then(function (users) {
       var lastId = null; try { lastId = localStorage.getItem('sqlkurs.lastUser'); } catch (e) { }
       var last = users.filter(function (x) { return x.id === lastId; })[0];
       if (last) usersBox.insertBefore(h('button.btn.primary.lg.continue-btn', { onclick: function () { login(last); } }, 'Продолжить как ' + last.name + ' →'), list);
+      if (users.length) usersBox.appendChild(h('div.row-btns.small-gap', h('button.btn.small.ghost', { onclick: function () { restoreInp.click(); }, title: 'Загрузить файлы прогресса (.json), скачанные раньше. Можно выбрать несколько.' }, I('upload', 16), 'Восстановить из файла')));
       if (S.recovered) U.toast('Прогресс восстановлен из резервной копии браузера (' + S.recovered + ')', 'ok', 5000);
       if (!users.length) {
         list.appendChild(h('p.muted', 'Пока нет ни одной учётной записи. Создайте свою ниже.'));
-        if (S.mode !== 'fs') usersBox.insertBefore(h('div.store-note.warn', 'Уже занимались, а здесь пусто? Значит, курс открыт в другом браузере (Chrome и Edge хранят данные отдельно), под другой учётной записью Windows — или браузер удалил данные сайтов при закрытии. Загрузите скачанную копию прогресса: ',
-          h('button.btn.small', { onclick: function () { restoreInp.click(); } }, 'Восстановить из файла'), ' ', h('a', { href: '#', onclick: function (e) { e.preventDefault(); A.diagnose(); } }, 'Проверка браузера')), list.nextSibling);
+        if (S.mode !== 'fs') usersBox.insertBefore(U.note('', 'history', h('b', 'Уже занимались? '), h('a', { href: '#', onclick: function (e) { e.preventDefault(); restoreInp.click(); } }, 'Восстановите прогресс из файла'),
+          U.more('Почему список пуст', h('div.small', 'Курс открыт в другом браузере (Chrome и Edge хранят данные отдельно), под другой учётной записью Windows — или браузер удалил данные сайтов при закрытии. Загрузите скачанную копию прогресса. ', h('a', { href: '#', onclick: function (e) { e.preventDefault(); A.diagnose(); } }, 'Проверка браузера')))), list.nextSibling);
       }
       users.forEach(function (u) {
         var r = A.rank(u.xp || 0);
         list.appendChild(h('button.user-card', { onclick: function () { login(u); } },
           h('div.avatar', (u.name || '?').trim().charAt(0).toUpperCase()),
           h('div.uc-info', h('div.uc-n', u.name), h('div.muted', r.name + ' · ' + (u.xp || 0) + ' XP' + (u.dept ? ' · ' + u.dept : ''))),
-          u.pinHash ? h('span.lock', { title: 'Защищено PIN-кодом' }, '🔒') : null));
+          u.pinHash ? h('span.lock', { title: 'Защищено PIN-кодом' }, I('lock', 16)) : null));
       });
     });
     var name = h('input.inp', { placeholder: 'Фамилия и имя, например: Асанова Айгуль', maxlength: 60 });
@@ -627,7 +743,7 @@
     var hero = h('div.hero',
       h('div.hero-l',
         h('h1', 'Привет, ' + u.name.split(' ').slice(-1)[0] + '!'),
-        h('p.muted', C.subtitle),
+        h('p', doneL ? 'Продолжайте с того места, где остановились.' : 'Начните с первого урока — это займёт 10–15 минут.'),
         cont ? h('a.btn.primary.lg', { href: A.lessonHref(cont.m, cont.i) }, (doneL ? 'Продолжить: ' : 'Начать: ') + (active.length > 1 ? A.pack(cont.m.pack).title + ', ' : '') + 'модуль ' + cont.m.num + ', урок ' + (cont.i + 1)) : h('a.btn.primary.lg', { href: '#/trainer' }, lessons.length ? 'Уроки пройдены! Перейти в тренажёр' : 'Перейти в тренажёр')),
       h('div.hero-stats',
         stat(r.name, 'ранг', r.next ? 'до «' + r.nextName + '»: ' + (r.next - u.xp) + ' XP' : 'максимальный'),
@@ -637,18 +753,17 @@
         stat(st.trainer + '/' + st.trainerAll, 'задач тренажёра', ''),
         stat(String(u.streak.days), U.plural(u.streak.days, 'день', 'дня', 'дней') + ' подряд', 'рекорд: ' + (u.streak.best || u.streak.days))));
     if (A.backupDue(u)) {
-      var bn = h('div.store-note.warn.backup-note', '💾 Прогресс хранится в браузере. Скачайте копию в файл — если браузер очистит данные или вы перейдёте на другой компьютер, её можно будет загрузить обратно. ' + (u.backup ? 'Последняя копия: ' + U.fmtDate(u.backup.at) + '. ' : ''),
-        h('button.btn.small.primary', { onclick: function () { A.backupFile(u); bn.remove(); } }, '⤓ Скачать копию'), ' ',
-        h('a', { href: '#/profile' }, 'автокопия'));
+      var bn = U.note('warn.backup-note', 'download', h('b', 'Сохраните копию прогресса'), h('div.small.muted', u.backup ? 'Последняя копия: ' + U.fmtDate(u.backup.at) : 'Копий ещё не было'),
+        h('div.row-btns.small-gap', h('button.btn.small.primary', { onclick: function () { A.backupFile(u); bn.remove(); } }, I('download', 16), 'Скачать'), h('a.btn.small.ghost', { href: '#/profile' }, 'Автокопия')));
       page.appendChild(bn);
     }
     page.appendChild(hero);
     active.forEach(function (p) {
       var cnt = PF.counts(p);
       page.appendChild(h('div.pack-h',
-        h('span.pack-ic', p.icon),
+        I.pack(p, 'lg'),
         h('div.pack-ht', h('h2', p.title), h('div.muted.small', 'база ' + p.dbName + ' · ' + cnt.tables + ' ' + U.plural(cnt.tables, 'таблица', 'таблицы', 'таблиц') + (cnt.trainer ? ' · тренажёр: ' + cnt.trainer : ''))),
-        h('div.pack-links', h('a.btn.small', { href: '#/schema/' + p.id }, 'Схема'), h('a.btn.small', { href: '#/sandbox/' + p.id }, 'Песочница'), cnt.trainer ? h('a.btn.small', { href: '#/trainer/0/' + p.id }, 'Тренажёр') : null)));
+        h('div.pack-links', h('a.btn.small', { href: '#/schema/' + p.id, title: 'Схема базы' }, I('schema', 16), 'Схема'), h('a.btn.small', { href: '#/sandbox/' + p.id, title: 'Песочница' }, I('terminal', 16), 'Песочница'), cnt.trainer ? h('a.btn.small', { href: '#/trainer/0/' + p.id, title: 'Тренажёр' }, I('target', 16), 'Тренажёр') : null)));
       var mods = A.packModules(p);
       if (mods.length) {
         var grid = h('div.mod-grid');
@@ -669,7 +784,7 @@
         p.sets.forEach(function (set) {
           var ss = A.setState(set);
           sg.appendChild(h('a.mod-card.set', { href: '#/set/' + encodeURIComponent(set.id) },
-            h('div.mod-top', h('span.mod-num.set', '✎'), ss.done === ss.total && ss.total ? h('span.badge.ok', 'решено') : (ss.done ? h('span.badge', ss.pct + '%') : null)),
+            h('div.mod-top', h('span.mod-num.set', I('edit', 17)), ss.done === ss.total && ss.total ? h('span.badge.ok', 'решено') : (ss.done ? h('span.badge', ss.pct + '%') : null)),
             h('div.mod-title', set.title),
             h('div.mod-desc', set.short || ''),
             h('div.mod-meta', 'задач: ' + ss.done + '/' + ss.total),
@@ -680,11 +795,11 @@
       if (!mods.length && !p.sets.length) page.appendChild(h('p.muted', cnt.trainer ? 'Задачи этой базы — в тренажёре. Свободные запросы — в песочнице.' : 'В этой базе пока нет заданий — изучайте её в песочнице.'));
     });
     var others = P.all().filter(function (p) { return active.indexOf(p) < 0; });
-    if (others.length) page.appendChild(h('div.card.pad.more-packs', h('b', 'Доступны и другие учебные базы: '), others.map(function (p) { return p.icon + ' ' + p.title; }).join(', '), ' ', h('a.btn.small', { href: '#/packs' }, 'Выбрать базы →')));
+    if (others.length) page.appendChild(h('div.card.pad.more-packs', h('b', 'Доступны и другие учебные базы: '), others.map(function (p) { return p.title; }).join(', '), ' ', h('a.btn.small', { href: '#/packs' }, 'Выбрать базы →')));
     // достижения и журнал
     var achBox = h('div.card.pad', h('div.card-head', h('h3', 'Достижения'), h('a', { href: '#/ach' }, 'все →')));
     var achRow = h('div.ach-row');
-    C.achievements.forEach(function (a) { achRow.appendChild(h('div.ach-mini' + (u.ach[a.id] ? '.got' : ''), { title: a.title + ' — ' + a.desc }, a.icon)); });
+    C.achievements.forEach(function (a) { achRow.appendChild(h('div.ach-mini' + (u.ach[a.id] ? '.got' : ''), { title: a.title + ' — ' + a.desc }, G.Icon.ach(a.id, 20))); });
     achBox.appendChild(achRow);
     var logBox = h('div.card.pad', h('h3', 'Последние события'));
     (u.log || []).slice(0, 8).forEach(function (l) { logBox.appendChild(h('div.log-row', h('span.muted', U.fmtDate(l.at)), ' ', l.t)); });
@@ -699,7 +814,7 @@
     var grid = h('div.ach-grid');
     C.achievements.forEach(function (a) {
       var got = A.user.ach[a.id];
-      grid.appendChild(h('div.ach-card' + (got ? '.got' : ''), h('div.ach-ic', a.icon), h('div', h('div.ach-t', a.title), h('div.muted', a.desc), got ? h('div.small.ok-t', 'получено ' + U.fmtDate(got)) : h('div.small.muted', 'ещё не получено'))));
+      grid.appendChild(h('div.ach-card' + (got ? '.got' : ''), h('div.ach-ic', G.Icon.ach(a.id, 24)), h('div', h('div.ach-t', a.title), h('div.muted', a.desc), got ? h('div.small.ok-t', 'получено ' + U.fmtDate(got)) : h('div.small.muted', 'ещё не получено'))));
     });
     page.appendChild(grid);
     view.appendChild(page);
@@ -739,7 +854,7 @@
     page.appendChild(h('div.card.pad', h('h3', 'Резервная копия в файл'),
       h('p.muted', 'Файл прогресса нужен, чтобы перенести его на другой компьютер, передать преподавателю или восстановить, если браузер очистил данные. ' + (u.backup ? 'Последняя копия: ' + U.fmtDate(u.backup.at) + '.' : 'Копий ещё не было.')),
       h('div.row-btns',
-        h('button.btn.primary', { onclick: function () { A.backupFile(u); A.dispatch(); } }, '⤓ Скачать копию (.json)'),
+        h('button.btn.primary', { onclick: function () { A.backupFile(u); A.dispatch(); } }, I('download', 18), 'Скачать копию'),
         h('button.btn', { onclick: function () { fileInp.click(); } }, 'Загрузить из файла'), fileInp),
       S.mode === 'fs' ? null : h('label.inline.mt', autoCb, ' Автокопия: раз в день сохранять файл в папку «Загрузки» (если браузер очищает данные при закрытии — включите обязательно)')));
     var snapBox = h('div.card.pad', h('h3', 'Копии в браузере'), h('p.muted', 'Курс сам делает снимок прогресса не реже раза в 15 минут занятий и хранит 30 последних. Можно вернуться к любому — например, после случайного сброса.'));
@@ -784,7 +899,7 @@
 
   /* ================= Сводка по группе (для преподавателя) ================= */
   A.route(/^#\/team$/, function (view) {
-    var page = h('div.page', h('h1', 'Сводка по группе'), h('p.muted', 'Учётные записи из папки прогресса курса. Если папка курса лежит на общем сетевом диске, здесь видно продвижение всей группы. Если запись в папку запрещена, ученики выгружают прогресс в профиле («Скачать прогресс»), а вы загружаете эти файлы кнопкой ниже. «Уроки» и «ДЗ» — по основному курсу (Учебный банк), «Задачи по базам» — решено задач практикума и тренажёра в каждой базе.'));
+    var page = h('div.page', h('h1', 'Сводка по группе'), h('div.intro-row', h('p.muted', 'Прогресс учеников: из папки прогресса или из загруженных файлов.'), U.info('Как собрать сводку', function () { return h('p', 'Учётные записи из папки прогресса курса. Если папка курса лежит на общем сетевом диске, здесь видно продвижение всей группы. Если запись в папку запрещена, ученики выгружают прогресс в профиле («Скачать прогресс»), а вы загружаете эти файлы кнопкой ниже. «Уроки» и «ДЗ» — по основному курсу (Учебный банк), «Задачи по базам» — решено задач практикума и тренажёра в каждой базе.'); })));
     view.appendChild(page);
     var holder = h('div'); page.appendChild(holder);
     var extra = {};
