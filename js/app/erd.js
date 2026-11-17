@@ -592,7 +592,10 @@
   P.resize = function () {
     if (!this.W) this.fitHeight();
     var cv = this.canvas, ratio = window.devicePixelRatio || 1, d = this.devBox, cw, ch, bw, bh;
-    if (d && d.cw && d.ch) { cw = d.cw; ch = d.ch; } else { cw = cv.clientWidth; ch = cv.clientHeight; }
+    cw = cv.clientWidth; ch = cv.clientHeight;   // размер на странице сейчас (целые px)
+    // данные наблюдателя точнее (дробные px и пиксели экрана), но могли устареть — например, высоту только что поменял fitHeight;
+    // тогда берём текущий размер, а наблюдатель следом пришлёт точный
+    if (d && Math.abs(d.cw - cw) < 1 && Math.abs(d.ch - ch) < 1) { cw = d.cw; ch = d.ch; } else d = null;
     bw = Math.round(cw * ratio); bh = Math.round(ch * ratio);
     // точный размер от браузера отличается от расчётного не больше чем на пиксель; если расхождение больше
     // (браузер его не сообщает или страница открыта в режиме эмуляции устройства) — остаётся расчётный
