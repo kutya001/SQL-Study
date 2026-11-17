@@ -83,9 +83,9 @@
     var tabs = h('div.res-tabs'), panes = h('div.res-panes');
     container.appendChild(tabs); container.appendChild(panes);
     var list = [];
-    function addTab(name, el, badge) {
+    function addTab(name, el, badge, tip) {
       var idx = list.length;
-      var b = h('button.res-tab', { onclick: function () { select(idx); } }, name, badge ? h('span.badge', badge) : null);
+      var b = h('button.res-tab', { title: tip || '', onclick: function () { select(idx); } }, name, badge ? h('span.badge', badge) : null);
       tabs.appendChild(b); list.push({ b: b, el: el }); panes.appendChild(el);
     }
     function select(i) { list.forEach(function (t, j) { t.b.classList.toggle('active', i === j); t.el.style.display = i === j ? '' : 'none'; }); }
@@ -97,13 +97,13 @@
       });
     } else if (!res.error) resPane.appendChild(h('div.grid-empty', 'Запрос не вернул таблицу. Смотрите вкладку «Сообщения».'));
     if (res.error) resPane.appendChild(errorBox(res.error));
-    addTab('Результаты', resPane, res.results.length ? String(res.results[res.results.length - 1].rows.length) : null);
+    addTab('Результаты', resPane, res.results.length ? String(res.results[res.results.length - 1].rows.length) : null, 'Таблица результата; число — сколько строк вернул запрос');
     var msg = h('div.res-pane.msgs');
     res.messages.forEach(function (m) { msg.appendChild(h('div', m)); });
     if (res.error) msg.appendChild(errorBox(res.error));
     msg.appendChild(h('div.muted', 'Время выполнения: ' + res.timeMs + ' мс'));
-    addTab('Сообщения', msg);
-    if (opts.trace) addTab('Пошагово', traceView(res.trace));
+    addTab('Сообщения', msg, null, 'Сообщения сервера: число строк, время выполнения, текст ошибки');
+    if (opts.trace) addTab('Пошагово', traceView(res.trace), null, 'Как сервер выполнял запрос: FROM → WHERE → GROUP BY → SELECT → ORDER BY');
     select(opts.showTrace && opts.trace ? 2 : 0);
     return { select: select };
   }

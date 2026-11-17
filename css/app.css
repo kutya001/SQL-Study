@@ -1076,9 +1076,9 @@ label.inline.mt { display: flex; margin-top: 12px; font-size: 14px; color: var(-
 .pal-card.on .pal-ok { display: grid; }
 /* кнопка оформления на странице входа — в правом верхнем углу страницы (уезжает вместе с ней при прокрутке) */
 #view.start { position: relative; }
-.start-pal { position: absolute; z-index: 5; top: calc(14px + var(--safe-t)); right: 14px; background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); box-shadow: var(--shadow); }
+.start-pal, .start-help { position: absolute; z-index: 5; top: calc(14px + var(--safe-t)); right: 14px; background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); box-shadow: var(--shadow); }
 @media (max-width: 860px) { .start-logo h1 { padding-right: 46px; } }   /* на узком экране заголовок не заходит под кнопку */
-@media (max-width: 560px) { .start-pal { top: calc(6px + var(--safe-t)); right: 8px; width: 36px; height: 36px; } }
+@media (max-width: 560px) { .start-pal, .start-help { top: calc(6px + var(--safe-t)); right: 8px; width: 36px; height: 36px; } }
 /* плавная смена цветов при переключении палитры или темы (класс ставится на полсекунды, см. smoothColors в app.js) */
 html.pal-anim, html.pal-anim body, html.pal-anim *:not(canvas) { transition: background-color .45s ease, color .45s ease, border-color .45s ease, box-shadow .45s ease, fill .45s ease, stroke .45s ease !important; }
 @media (max-width: 720px) {
@@ -1087,6 +1087,118 @@ html.pal-anim, html.pal-anim body, html.pal-anim *:not(canvas) { transition: bac
   .pal-mini { left: 10px; right: 10px; top: 11px; bottom: 11px; }
   .pal-txt b { font-size: 13.5px; }
 }
+
+/* ==========================================================
+   Подсказки и обучение (js/app/guide.js): экскурсия, метки-подсказки, страница «О курсе», всплывающие подписи
+   ========================================================== */
+/* кнопка «?»: точка — у этой страницы есть экскурсия, которую ещё не открывали */
+.tb-help { position: relative; }
+.tb-help.has-new::after { content: ""; position: absolute; top: 7px; right: 7px; width: 9px; height: 9px; border-radius: 50%; background: var(--xp); box-shadow: 0 0 0 2px var(--surface-solid); animation: guide-ping 2.2s ease-in-out infinite; }
+@keyframes guide-ping { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+.side-actions .side-help { display: none; }   /* на компьютере «?» — в верхней панели */
+/* экскурсия: затемнение с «окном» вокруг элемента и пояснение рядом */
+.guide { position: fixed; inset: 0; z-index: 300; }
+.guide-shade { position: absolute; inset: 0; }   /* перехватывает нажатия: пока идёт экскурсия, страница под ней не реагирует */
+.guide.no-target .guide-shade { background: rgba(8, 12, 28, .58); }   /* шаг без элемента: пояснение по центру экрана */
+.guide.no-target .guide-pop { text-align: center; }
+.guide.no-target .guide-dots { justify-content: center; }
+.guide-hole { position: fixed; border-radius: 14px; pointer-events: none; box-shadow: 0 0 0 2px var(--primary), 0 0 0 6px var(--primary-soft), 0 0 0 9999px rgba(8, 12, 28, .58); transition: left .26s var(--ease), top .26s var(--ease), width .26s var(--ease), height .26s var(--ease); }
+.guide-pop { position: fixed; width: 348px; max-width: calc(100vw - 20px); padding: 16px 16px 14px; border-radius: 18px; background: var(--surface-solid); color: var(--text); border: 1px solid var(--border-strong); box-shadow: var(--shadow-lg); animation: guide-in .22s var(--ease); }
+@keyframes guide-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.guide-pop::before { content: ""; position: absolute; width: 12px; height: 12px; background: var(--surface-solid); border: 1px solid var(--border-strong); border-right: 0; border-bottom: 0; display: none; }
+.guide-pop.at-bottom::before { display: block; top: -7px; left: calc(var(--ax, 40px) - 6px); transform: rotate(45deg); }
+.guide-pop.at-top::before { display: block; bottom: -7px; left: calc(var(--ax, 40px) - 6px); transform: rotate(225deg); }
+.guide-pop.at-right::before { display: block; left: -7px; top: calc(var(--ay, 40px) - 6px); transform: rotate(-45deg); }
+.guide-pop.at-left::before { display: block; right: -7px; top: calc(var(--ay, 40px) - 6px); transform: rotate(135deg); }
+.guide-cap { font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--primary); padding-right: 30px; }
+.guide-cap span { color: var(--faint); font-weight: 600; }
+.guide-pop h3 { margin: 6px 0 6px; font-size: 17px; line-height: 1.25; }
+.guide-text { font-size: 14px; line-height: 1.5; color: var(--text); }
+.guide-text kbd, .help kbd { display: inline-block; padding: 0 6px; border-radius: 6px; background: var(--surface-2); font: 600 12px var(--mono); line-height: 1.6; }
+.guide-text code { font-size: 12.5px; }
+.guide-dots { display: flex; flex-wrap: wrap; gap: 4px; margin: 12px 0 10px; }
+.guide-dots i { width: 14px; height: 4px; border-radius: 3px; background: var(--surface-3); }
+.guide-dots i.past { background: var(--primary-soft); box-shadow: inset 0 0 0 9px var(--primary-soft); }
+.guide-dots i.on { background: var(--primary); }
+.guide-btns { display: flex; align-items: center; gap: 8px; }
+.guide-btns .guide-sp { flex: 1; }
+.guide-btns .btn.ghost { margin-left: -8px; }
+.guide-x { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; }
+.guide-x:hover { background: var(--surface-2); color: var(--text); }
+body.guide-on.bars-hidden #topbar, body.guide-on.bars-hidden #tabbar { transform: none; }   /* на телефоне панели не прячутся, пока на них показывают */
+/* метки-подсказки: номера на элементах страницы */
+.guide-marks { position: fixed; inset: 0; z-index: 250; pointer-events: none; }
+.guide-mark { position: fixed; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center; pointer-events: auto; cursor: pointer; background: var(--grad); color: #fff; font: 700 12.5px var(--sans); box-shadow: 0 0 0 3px var(--surface-solid), 0 6px 14px -4px var(--glow); animation: guide-mark 2.4s ease-in-out infinite; }
+.guide-mark:hover, .guide-mark:focus-visible { transform: scale(1.15); animation: none; outline: none; box-shadow: 0 0 0 3px var(--surface-solid), 0 0 0 6px var(--primary-soft); }
+@keyframes guide-mark { 0%, 100% { box-shadow: 0 0 0 3px var(--surface-solid), 0 6px 14px -4px var(--glow); } 50% { box-shadow: 0 0 0 3px var(--surface-solid), 0 0 0 8px var(--primary-soft); } }
+.guide-bar { position: fixed; left: 50%; bottom: calc(18px + var(--safe-b)); transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 20px); padding: 8px 8px 8px 14px; border-radius: 16px; pointer-events: auto; background: var(--surface-solid); border: 1px solid var(--border-strong); box-shadow: var(--shadow-lg); font-size: 13.5px; }
+.guide-bar > svg { color: var(--xp); flex: none; }
+/* предложение знакомства на главной */
+.guide-offer { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 14px; padding: 14px 16px; border-radius: 20px; background: var(--surface); border: 1px solid var(--primary); box-shadow: 0 0 0 4px var(--primary-soft), var(--shadow); }
+.guide-offer .go-ic { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); flex: none; }
+.guide-offer .go-t { flex: 1 1 240px; min-width: 0; }
+.guide-offer .row-btns { margin: 0; }
+.menu-item small { display: block; color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 1px; }
+/* страница «О курсе» */
+.help-lead { font-size: 16.5px; line-height: 1.55; max-width: 76ch; margin: 4px 0 16px; }
+.help-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 16px; }
+.help-fact { padding: 14px; border-radius: 18px; background: var(--surface); border: 1px solid var(--glass-bd); box-shadow: var(--shadow); display: grid; gap: 4px; align-content: start; }
+.help-fact .hf-ic { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); margin-bottom: 4px; }
+.help h2 { margin: 2px 0 10px; font-size: 19px; }
+.help h4 { margin: 14px 0 6px; font-size: 14px; }
+.help-path { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.help-path li { display: flex; gap: 12px; align-items: flex-start; }
+.help-path .hp-n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--grad); color: #fff; font-weight: 700; font-size: 13px; }
+.help-rows { display: grid; gap: 2px; }
+.help-row { display: flex; align-items: center; gap: 12px; padding: 9px 8px; border-radius: 14px; }
+.help-row:hover { background: var(--surface-2); }
+.help-row .hr-ic { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex: none; background: var(--primary-soft); color: var(--primary); }
+.help-row .hr-t { flex: 1; min-width: 0; }
+.help-row .row-btns { margin: 0; flex: none; flex-wrap: nowrap; }
+.help-list { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.help-ranks { display: flex; flex-wrap: wrap; gap: 6px; }
+.help-keys { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 28px; }
+.help-keys h4 { margin-top: 8px; }
+.hk-t { width: 100%; }
+.hk-t td { padding: 5px 0; vertical-align: top; font-size: 13.5px; }
+.hk-t td:first-child { width: 46%; padding-right: 12px; color: var(--muted); }
+.help-faq { display: grid; gap: 6px; }
+.help-faq details { border: 1px solid var(--border); border-radius: 14px; padding: 0 14px; background: var(--field); }
+.help-faq summary { cursor: pointer; padding: 11px 0; font-weight: 600; list-style-position: outside; }
+.help-faq p { margin: 0 0 12px; color: var(--muted); line-height: 1.55; }
+.help-about .help-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.help-about h4 { margin: 4px 0 10px; }
+.start-help { right: 62px; }
+/* всплывающая подпись */
+.tip { position: fixed; z-index: 400; left: 0; top: 0; max-width: 290px; padding: 6px 10px; border-radius: 10px; background: #1b2436; color: #f1f4fa; font: 500 12.5px/1.4 var(--sans); white-space: pre-line; pointer-events: none; opacity: 0; transform: translateY(2px); transition: opacity .12s ease, transform .12s ease; box-shadow: 0 8px 22px -8px rgba(0, 0, 0, .5); }
+[data-theme="dark"] .tip { background: #e8ecf5; color: #131a29; }
+.tip.on { opacity: 1; transform: none; }
+@media (max-width: 1023px) {
+  .side-actions .side-help { display: inline-grid; }
+  .tb-right .tb-help { display: none; }
+}
+@media (max-width: 860px) {
+  .help-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .help-keys { grid-template-columns: minmax(0, 1fr); }
+  .start-logo h1 { padding-right: 92px; }
+}
+@media (max-width: 639px) {
+  .guide-pop { width: calc(100vw - 20px); }
+  .guide-pop::before { display: none !important; }
+  .help-row { flex-wrap: wrap; }
+  .help-row .row-btns { margin-left: 50px; }
+  .guide-bar { left: 10px; right: 10px; transform: none; bottom: calc(86px + var(--safe-b)); }   /* над нижней панелью */
+  .guide-bar span { flex: 1; font-size: 13px; }
+}
+@media (max-width: 560px) {
+  .start-help { right: 50px; }
+  .help-facts, .help-about .help-facts { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-hole, .tip { transition: none; }
+  .guide-pop, .guide-mark, .tb-help.has-new::after { animation: none; }
+}
+@media print { .guide, .guide-marks, .tip, .guide-offer { display: none !important; } }
 
 /* ---------- интерфейс во всю ширину экрана ---------- */
 body.wide-ui .page, body.wide-ui .page.wide, body.wide-ui .page.task-page, body.wide-ui .page.lesson { max-width: none; }

@@ -6,7 +6,8 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "build": "node tools/build-index.js",
-    "check": "node tools/validate-course.js && node tools/validate-packs.js && node tools/test-engine.js && node tools/build-index.js --check",
+    "check": "node tools/validate-course.js && node tools/validate-packs.js && node tools/test-engine.js && node tools/validate-guide.js && node tools/build-index.js --check",
+    "check:guide": "node tools/validate-guide.js",
     "check:course": "node tools/validate-course.js",
     "check:packs": "node tools/validate-packs.js",
     "serve": "python3 -m http.server 8000",

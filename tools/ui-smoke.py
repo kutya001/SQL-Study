@@ -6,7 +6,8 @@
 
 Проверяет: стартовую страницу, хранение в браузере, вход, решение задачи тренажёра,
 загрузку учебных баз из schemas/index.js, песочницу с USE, таблицу результата (общий компонент),
-схему на canvas, фильтр тренажёра по командам, сохранение после перезагрузки
+схему на canvas, фильтр тренажёра по командам, сохранение после перезагрузки,
+подсказки и экскурсии (каждый шаг находит свой элемент — на компьютере и на телефоне)
 и отсутствие ошибок в консоли.
 """
 import asyncio, os, subprocess, sys, tempfile, time, pathlib
@@ -96,6 +97,83 @@ async def scenario(browser, url, tag, errors):
     print(f'  {tag}: базы {", ".join(packs)}; задача засчитана; таблица, схема, фильтр тренажёра и смена палитры работают; XP {xp} сохранился после перезагрузки')
     await ctx.close()
 
+# Подсказки и экскурсии: на компьютере и на телефоне каждый шаг каждой экскурсии находит свой элемент,
+# экскурсия проходится от начала до конца, работают меню «?», метки-подсказки и страница «О курсе».
+async def guide(browser, url, tag, errors, phone):
+    ctx = await browser.new_context(**({'viewport': {'width': 390, 'height': 800}, 'is_mobile': True, 'has_touch': True} if phone else {'viewport': {'width': 1440, 'height': 900}}))
+    pg = await ctx.new_page()
+    pg.on('pageerror', lambda e: errors.append(f'{tag}: {e}'))
+    pg.on('console', lambda m: m.type == 'error' and errors.append(f'{tag}: {m.text}'))
+    await pg.goto(url); await pg.wait_for_timeout(900)
+    await pg.locator('.start-help').click(); await pg.wait_for_timeout(300)
+    assert await pg.locator('.modal .help-about').count() == 1, f'{tag}: на странице входа не открылось окно «О курсе»'
+    await pg.keyboard.press('Escape')
+    await pg.get_by_text('Хранить в браузере').click(); await pg.wait_for_timeout(300)
+    await pg.fill('input[placeholder^="Фамилия и имя"]', 'Проверка Подсказок')
+    await pg.get_by_text('Создать и начать').click(); await pg.wait_for_timeout(1300)
+    # первое знакомство: предложение на главной и точка на кнопке «?»
+    assert await pg.locator('.guide-offer').count() == 1, f'{tag}: нет предложения экскурсии при первом входе'
+    assert await pg.evaluate('Guide.isNew()'), f'{tag}: кнопка «?» не отмечена на новой странице'
+    await pg.locator('.guide-offer .btn.primary').click(); await pg.wait_for_timeout(400)
+    n = await pg.evaluate("Guide.usable('intro').length")
+    assert await pg.evaluate('Guide.active()') == 'intro' and n >= 8, f'{tag}: знакомство не началось ({n} шагов)'
+    for i in range(n):
+        box = await pg.evaluate("""(() => { const p = document.querySelector('.guide-pop').getBoundingClientRect(); return p.left >= 0 && p.top >= 0 && p.right <= innerWidth + 1 && p.bottom <= innerHeight + 1; })()""")
+        assert box, f'{tag}: пояснение шага {i + 1} выходит за экран'
+        await pg.locator('.guide-pop .btn.primary').click(); await pg.wait_for_timeout(120)
+    st = await pg.evaluate("({active: Guide.active(), seen: App.user.settings.guide.seen.intro, offer: document.querySelectorAll('.guide-offer').length, dot: Guide.isNew()})")
+    assert st == {'active': None, 'seen': 1, 'offer': 0, 'dot': False}, f'{tag}: знакомство не завершилось: {st}'
+    # две базы — чтобы на страницах были переключатели баз
+    await pg.evaluate("(() => { const u = App.user; Packs.all().slice(0, 2).forEach(p => Packs.setActive(u, p.id, true)); App.save(); })()")
+    task = await pg.evaluate("(App.trainerTasks().find(t => t.hint) || {}).id")
+    lesson = await pg.evaluate("""(() => { for (const x of App.allLessons()) { const k = x.l.steps.findIndex(s => s.t === 'example'); if (k >= 0) return App.lessonHref(x.m, x.i, k); } return null; })()""")
+    module = await pg.evaluate("(() => { const m = App.modules().find(m => m.homework && m.homework.length); return m ? App.modHref(m) : null; })()")
+    pages = [('intro', '#/home'), ('module', module), ('lesson', lesson), ('task', '#/t/' + task), ('trainer', '#/trainer'), ('sandbox', '#/sandbox'),
+             ('schema', '#/schema'), ('packs', '#/packs'), ('profile', '#/profile'), ('cheat', '#/cheat'), ('ach', '#/ach')]
+    total = 0
+    for tid, href in pages:
+        assert href, f'{tag}: для экскурсии «{tid}» не нашлось страницы'
+        await pg.goto(url + href); await pg.wait_for_timeout(700)
+        if tid in ('task', 'sandbox'):   # результат запроса — тоже шаг экскурсии
+            if tid == 'task': await pg.locator('textarea.ed-ta').first.fill('SELECT TOP (5) * FROM Clients;')
+            await pg.locator('[data-guide="run"]').first.click(); await pg.wait_for_timeout(400)
+        assert await pg.evaluate("(Guide.pageTour() || {}).id") == tid, f'{tag}: странице {href} назначена не та экскурсия'
+        miss = await pg.evaluate(f"Guide.missing('{tid}')")
+        assert not miss, f'{tag}: экскурсия «{tid}» ({href}) не находит элементы: {miss}'
+        if tid in ('task', 'sandbox'):
+            miss = await pg.evaluate("Guide.missing('grid')")
+            assert not miss, f'{tag}: экскурсия «grid» на странице {href} не находит элементы: {miss}'
+        ok = await pg.evaluate(f"Guide.start('{tid}')")
+        k = await pg.evaluate(f"Guide.usable('{tid}').length")
+        assert ok and k >= 1, f'{tag}: экскурсия «{tid}» не запустилась'
+        for i in range(k):
+            geo = await pg.evaluate("""(() => { const p = document.querySelector('.guide-pop').getBoundingClientRect(), h = document.querySelector('.guide-hole'), r = h.getBoundingClientRect();
+              return { pop: p.left >= 0 && p.top >= 0 && p.right <= innerWidth + 1 && p.bottom <= innerHeight + 1, hole: h.style.display === 'none' || (r.bottom > 0 && r.top < innerHeight && r.width > 6 && r.height > 6) }; })()""")
+            assert geo['pop'] and geo['hole'], f'{tag}: «{tid}», шаг {i + 1}: пояснение или подсветка вне экрана: {geo}'
+            await pg.keyboard.press('ArrowRight'); await pg.wait_for_timeout(90)
+        assert await pg.evaluate('Guide.active()') is None, f'{tag}: экскурсия «{tid}» не закрылась после последнего шага'
+        total += k
+    # меню «?», метки-подсказки, страница «О курсе»
+    await pg.goto(url + '#/trainer'); await pg.wait_for_timeout(600)
+    await pg.evaluate('Guide.menu()'); await pg.wait_for_timeout(300)
+    assert await pg.locator('.modal .guide-menu .menu-item').count() >= 4, f'{tag}: в меню «Помощь» не хватает пунктов'
+    await pg.locator('.modal .guide-menu .menu-item').nth(1).click(); await pg.wait_for_timeout(400)
+    marks = await pg.locator('.guide-mark').count()
+    assert marks >= 3, f'{tag}: метки-подсказки не появились ({marks})'
+    await pg.locator('.guide-mark').nth(1).click(); await pg.wait_for_timeout(300)
+    assert await pg.evaluate('Guide.active()') == 'trainer' and await pg.locator('.guide-mark').count() == 0, f'{tag}: нажатие на метку не открыло пояснение'
+    await pg.keyboard.press('Escape')
+    await pg.goto(url + '#/help'); await pg.wait_for_timeout(500)
+    rows = await pg.locator('.help-row').count(); tours = await pg.evaluate('Guide.tours.length')
+    assert rows >= tours and await pg.locator('.help-faq details').count() >= 5, f'{tag}: страница «О курсе» неполная ({rows} строк)'
+    await pg.locator('button[data-tour="grid"]').click(); await pg.wait_for_timeout(1300)
+    assert await pg.evaluate("[location.hash.indexOf('#/sandbox') === 0, Guide.active()]") == [True, 'grid'], f'{tag}: экскурсия по таблице не открылась со страницы «О курсе»'
+    await pg.keyboard.press('Escape')
+    over = await pg.evaluate('document.documentElement.scrollWidth - innerWidth')
+    assert over <= 0, f'{tag}: горизонтальная прокрутка ({over}px)'
+    print(f'  {tag}: знакомство — {n} шагов; экскурсий по страницам {len(pages)}, шагов пройдено {total}; меню «?», метки и «О курсе» работают')
+    await ctx.close()
+
 async def main():
     errors = []
     srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(PORT), '--bind', '127.0.0.2', '-d', str(ROOT)],
@@ -106,6 +184,8 @@ async def main():
             browser = await pw.chromium.launch(headless=not SHOW)
             await scenario(browser, f'http://127.0.0.2:{PORT}/', 'сайт (http)', errors)
             await scenario(browser, ROOT.as_uri() + '/index.html', 'из папки (file://)', errors)
+            await guide(browser, ROOT.as_uri() + '/index.html', 'подсказки, компьютер', errors, False)
+            await guide(browser, ROOT.as_uri() + '/index.html', 'подсказки, телефон', errors, True)
             await browser.close()
     finally:
         srv.terminate()

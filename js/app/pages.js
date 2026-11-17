@@ -27,14 +27,15 @@
     var it = A.item(task.id) || {};
     var box = h('div.task' + (it.ok ? '.solved' : ''));
     var status = h('span.task-status', it.ok ? [I('check-circle', 16), 'решено'] : '');
-    box.appendChild(h('div.task-head', h('span.task-tag', o.tag || 'Задание'), o.title ? h('span.task-title', o.title) : null, task.level ? h('span.lvl.l' + task.level, C.trainer.levels[task.level - 1].name) : null, o.showPack && pack ? h('span.tag', pack.dbName) : null, status));
+    box.appendChild(h('div.task-head', { 'data-guide': 'task-head' }, h('span.task-tag', o.tag || 'Задание'), o.title ? h('span.task-title', o.title) : null, task.level ? h('span.lvl.l' + task.level, C.trainer.levels[task.level - 1].name) : null, o.showPack && pack ? h('span.tag', pack.dbName) : null, status));
     box.appendChild(richHtml(task.text));
-    var resArea = h('div.task-res'), fb = h('div.task-fb');
-    var work = h('div.task-work'), main = h('div.tw-main'), side = h('div.tw-side'), pvArea = h('div.tw-preview');
+    var resArea = h('div.task-res', { 'data-guide': 'result' }), fb = h('div.task-fb');
+    var work = h('div.task-work'), main = h('div.tw-main'), side = h('div.tw-side', { 'data-guide': 'schema-panel' }), pvArea = h('div.tw-preview');
     work.appendChild(main); work.appendChild(side);
     box.appendChild(work);
     var ed = G.Editor.create(main, { value: it.sql || task.starter || '', minLines: o.minLines || 4, schema: pack && pack.tables, onRun: function (s) { run(s.sql); } });
-    var schemaBtn = h('button.btn.ghost.aux.schema-tgl', { title: 'Схема базы: таблицы и столбцы', onclick: function () {
+    ed.el.setAttribute('data-guide', 'editor');
+    var schemaBtn = h('button.btn.ghost.aux.schema-tgl', { title: 'Схема базы: таблицы и столбцы', 'data-guide': 'schema-btn', onclick: function () {
       if (window.innerWidth < 768) { if (pack) A.schemaSheet(pack, function (text) { ed.insert(text); }); return; }
       A.user.settings.schemaPanel = !schemaOn(); A.save(); applySchema();
     } }, I('schema', 18), h('span.bl', 'Схема'));
@@ -53,12 +54,12 @@
       }
     }
     var tries = it.tries || 0;
-    var solBtn = h('button.btn.ghost.aux', { onclick: showSolution, title: 'Решение' }, I('key', 18), h('span.bl', 'Решение'));
+    var solBtn = h('button.btn.ghost.aux', { onclick: showSolution, title: 'Решение: эталонный запрос с разбором', 'data-guide': 'solution' }, I('key', 18), h('span.bl', 'Решение'));
     var btns = h('div.task-btns',
-      h('button.btn.run', { onclick: function () { run(ed.getValue()); }, title: 'Выполнить (F5 или Ctrl+Enter)' }, I('play', 16), 'Выполнить'),
-      h('button.btn.primary', { onclick: check }, I('check', 18), 'Проверить'),
-      task.hint ? h('button.btn.ghost.aux', { onclick: hint, title: 'Подсказка' }, I('bulb', 18), h('span.bl', 'Подсказка')) : null,
-      h('button.btn.ghost.aux', { onclick: expected, title: 'Ожидаемый результат' }, I('eye', 18), h('span.bl', 'Ожидаемый результат')),
+      h('button.btn.run', { onclick: function () { run(ed.getValue()); }, title: 'Выполнить запрос и посмотреть результат (F5 или Ctrl+Enter)', 'data-guide': 'run' }, I('play', 16), 'Выполнить'),
+      h('button.btn.primary', { onclick: check, title: 'Проверить: сравнить ваш результат с эталоном', 'data-guide': 'check' }, I('check', 18), 'Проверить'),
+      task.hint ? h('button.btn.ghost.aux', { onclick: hint, title: 'Подсказка: с чего начать', 'data-guide': 'hint' }, I('bulb', 18), h('span.bl', 'Подсказка')) : null,
+      h('button.btn.ghost.aux', { onclick: expected, title: 'Ожидаемый результат: какая таблица должна получиться', 'data-guide': 'expected' }, I('eye', 18), h('span.bl', 'Ожидаемый результат')),
       solBtn, schemaBtn);
     main.appendChild(btns);
     main.appendChild(pvArea);
@@ -225,10 +226,10 @@
     var res = h('div.task-res');
     var ex = A.pack(s.pack);
     var ed = G.Editor.create(box, { value: s.sql, minLines: 3, schema: ex && ex.tables, onRun: function (x) { run(x.sql); } });
-    box.appendChild(h('div.task-btns',
-      h('button.btn.primary', { onclick: function () { run(ed.getValue()); }, title: 'Выполнить (F5 или Ctrl+Enter)' }, I('play', 16), 'Выполнить'),
-      s.noTrace ? null : h('button.btn', { onclick: function () { run(ed.getValue(), true); } }, 'Пошагово'),
-      h('button.btn.ghost', { onclick: function () { ed.setValue(s.sql); U.clear(res); } }, 'Вернуть пример'),
+    box.appendChild(h('div.task-btns', { 'data-guide': 'example-btns' },
+      h('button.btn.primary', { onclick: function () { run(ed.getValue()); }, title: 'Выполнить пример (F5 или Ctrl+Enter)' }, I('play', 16), 'Выполнить'),
+      s.noTrace ? null : h('button.btn', { onclick: function () { run(ed.getValue(), true); }, title: 'Пошагово: как SQL Server обрабатывает запрос, шаг за шагом' }, 'Пошагово'),
+      h('button.btn.ghost', { onclick: function () { ed.setValue(s.sql); U.clear(res); }, title: 'Вернуть исходный текст примера' }, 'Вернуть пример'),
       h('span.muted.small', 'Пример можно менять — экспериментируйте!')));
     box.appendChild(res);
     if (s.after) box.appendChild(richHtml(s.after));
@@ -263,9 +264,9 @@
     var page = h('div.page'); view.appendChild(page);
     var ms = A.moduleState(m);
     page.appendChild(h('div.crumbs', h('a', { href: '#/home' }, 'Курс'), packCrumb(m.pack), ' › Модуль ' + m.num));
-    page.appendChild(h('div.mod-hero', h('span.mod-num.big', String(m.num)), h('div', h('h1', m.title), richHtml(m.goal || m.short || ''))));
+    page.appendChild(h('div.mod-hero', { 'data-guide': 'mod-hero' }, h('span.mod-num.big', String(m.num)), h('div', h('h1', m.title), richHtml(m.goal || m.short || ''))));
     page.appendChild(h('div.pbar.big', h('div', { style: { width: ms.pct + '%' } })));
-    var list = h('div.lesson-list');
+    var list = h('div.lesson-list', { 'data-guide': 'lessons' });
     m.lessons.forEach(function (l, i) {
       var st = A.lessonState(l);
       list.appendChild(h('a.lesson-row' + (st.complete ? '.done' : ''), { href: A.lessonHref(m, i) },
@@ -274,7 +275,7 @@
         h('span.lr-go', st.complete ? 'повторить' : (st.visited ? 'продолжить' : 'начать'))));
     });
     if (m.homework && m.homework.length) {
-      list.appendChild(h('a.lesson-row.hw' + (ms.hwDone === ms.hw ? '.done' : ''), { href: '#/hw/' + encodeURIComponent(m.id) },
+      list.appendChild(h('a.lesson-row.hw' + (ms.hwDone === ms.hw ? '.done' : ''), { href: '#/hw/' + encodeURIComponent(m.id), 'data-guide': 'hw-row' },
         h('span.lr-n', ms.hwDone === ms.hw ? I('check', 18) : I('edit', 17)),
         h('div.lr-main', h('div.lr-t', 'Домашнее задание'), h('div.muted.small', ms.hw + ' ' + U.plural(ms.hw, 'задача', 'задачи', 'задач') + ' · решено ' + ms.hwDone)),
         h('span.lr-go', 'открыть')));
@@ -297,11 +298,11 @@
     var total = l.steps.length + 1; // +1 тренировка
     var idx = stepParam !== undefined ? Math.min(+stepParam, total - 1) : Math.min(rec.step || 0, total - 1);
     var page = h('div.page.lesson'); view.appendChild(page);
-    page.appendChild(h('div.crumbs', h('a', { href: '#/home' }, 'Курс'), packCrumb(m.pack), ' › ', h('a', { href: A.modHref(m) }, 'Модуль ' + m.num + '. ' + m.title), ' › Урок ' + num));
+    page.appendChild(h('div.crumbs', { 'data-guide': 'crumbs' }, h('a', { href: '#/home' }, 'Курс'), packCrumb(m.pack), ' › ', h('a', { href: A.modHref(m) }, 'Модуль ' + m.num + '. ' + m.title), ' › Урок ' + num));
     page.appendChild(h('h1', l.title));
-    var dots = h('div.steps-dots'); page.appendChild(dots);
-    var body = h('div.lesson-body'); page.appendChild(body);
-    var nav = h('div.lesson-nav'); page.appendChild(nav);
+    var dots = h('div.steps-dots', { 'data-guide': 'steps' }); page.appendChild(dots);
+    var body = h('div.lesson-body', { 'data-guide': 'lesson-body' }); page.appendChild(body);
+    var nav = h('div.lesson-nav', { 'data-guide': 'lesson-nav' }); page.appendChild(nav);
     var trainRefresh = null;
     // обновлять статус тренировки после ответов на вопросы (обработчик один на всю страницу)
     body.addEventListener('click', U.debounce(function () { if (trainRefresh) trainRefresh(); }, 300));
@@ -312,7 +313,7 @@
       for (var i = 0; i < total; i++) {
         (function (i) {
           var s = l.steps[i];
-          var lbl = i === total - 1 ? 'Тренировка' : (s.title || '');
+          var lbl = i === total - 1 ? 'Мини-тренировка' : (s.title || 'Шаг ' + (i + 1));
           dots.appendChild(h('button.sdot' + (i === idx ? '.active' : '') + (i < idx ? '.past' : '') + (i === total - 1 ? '.train' : ''), { title: lbl, onclick: function () { idx = i; draw(); window.scrollTo(0, 0); } }, i === total - 1 ? I('target', 15) : String(i + 1)));
         })(i);
       }
@@ -467,7 +468,7 @@
     page.appendChild(h('h1', 'Тренажёр'));
     page.appendChild(h('p.muted', 'Отдельные задачи по всей программе — для закрепления и подготовки к реальной работе. Уровни идут от простого к сложному. Решайте в любом порядке.'));
     if (sc.packs.length > 1) {
-      var chips = h('div.chips.pack-chips');
+      var chips = h('div.chips.pack-chips', { 'data-guide': 'pack-chips' });
       chips.appendChild(h('a.chip' + (!sc.cur ? '.on' : ''), { href: '#/trainer/0/all' }, 'Все базы (' + A.trainerTasks().length + ')'));
       sc.packs.forEach(function (p) { chips.appendChild(h('a.chip' + (sc.cur === p.id ? '.on' : ''), { href: '#/trainer/0/' + p.id }, I.pack(p, 'sm'), p.title + ' · ' + p.trainer.length)); });
       page.appendChild(chips);
@@ -477,7 +478,7 @@
     var cmds = cmdFilter(), allTasks = tasks;
     tasks = byCmds(allTasks, cmds);
     var setCmds = function (list) { A.user.settings.trainerCmds = list; A.save(); A.dispatch(); };
-    var cmdBox = h('div.cmd-filter', h('div.cmd-cap', I('filter', 15), h('span', 'Команды в решении'),
+    var cmdBox = h('div.cmd-filter', { 'data-guide': 'cmd-filter' }, h('div.cmd-cap', I('filter', 15), h('span', 'Команды в решении'),
       U.info('Фильтр по командам', function () { return h('div', h('p', 'Отметьте одну или несколько команд — останутся задачи, в эталонном решении которых есть все отмеченные. Например, ', h('code', 'WHERE'), ' + ', h('code', 'JOIN'), ' покажет задачи, где нужно и соединять таблицы, и отбирать строки.'), h('p.muted', 'Число на кнопке — сколько задач останется, если добавить эту команду. Ту же задачу часто можно решить и по-другому: фильтр смотрит только на эталон.')); })));
     var cmdChips = h('div.chips.cmd-chips');
     CMDS.forEach(function (c) {
@@ -496,7 +497,7 @@
     }, 0);
     if (cmds.length) cmdBox.appendChild(h('div.muted.small.cmd-sum', 'Найдено задач: ', h('b', String(tasks.length)), ' из ' + allTasks.length + ' — в решении есть ' + cmds.map(function (id) { return CMD_NAME[id]; }).join(' + ')));
     page.appendChild(cmdBox);
-    var levels = h('div.lvl-grid');
+    var levels = h('div.lvl-grid', { 'data-guide': 'levels' });
     var cur = lv ? +lv : 0;
     if (!cur) { cur = 1; for (var L = 1; L <= C.trainer.levels.length; L++) { var lt = tasks.filter(function (t) { return t.level === L; }); if (lt.some(function (t) { return !A.isDone(t.id); })) { cur = L; break; } } }
     // на выбранном уровне под фильтр ничего не подошло — открываем первый уровень, где задачи есть
@@ -511,9 +512,9 @@
     page.appendChild(levels);
     var lt2 = tasks.filter(function (t) { return t.level === cur; });
     var unsolved = lt2.filter(function (t) { return !A.isDone(t.id); });
-    page.appendChild(h('div.card-head', h('h2', 'Уровень ' + cur + ': ' + C.trainer.levels[cur - 1].name), unsolved.length ? h('a.btn', { href: '#/t/' + encodeURIComponent(unsolved[Math.floor(Math.random() * unsolved.length)].id) }, 'Случайная нерешённая') : (lt2.length ? h('span.badge.ok', 'уровень пройден') : null)));
+    page.appendChild(h('div.card-head', h('h2', 'Уровень ' + cur + ': ' + C.trainer.levels[cur - 1].name), unsolved.length ? h('a.btn', { href: '#/t/' + encodeURIComponent(unsolved[Math.floor(Math.random() * unsolved.length)].id), title: 'Открыть случайную нерешённую задачу этого уровня', 'data-guide': 'random' }, 'Случайная нерешённая') : (lt2.length ? h('span.badge.ok', 'уровень пройден') : null)));
     if (!lt2.length) page.appendChild(h('p.muted', cmds.length ? 'На этом уровне нет задач с выбранными командами — посмотрите другие уровни или уберите часть команд из фильтра.' : 'На этом уровне задач нет.'));
-    var list = h('div.tr-list');
+    var list = h('div.tr-list', { 'data-guide': 'tr-list' });
     var many = !sc.cur && sc.packs.length > 1;
     lt2.forEach(function (t, i) {
       var done = A.isDone(t.id), p = A.pack(t.pack);
@@ -538,7 +539,7 @@
     var page = h('div.page.task-page'); view.appendChild(page);
     page.appendChild(h('div.crumbs', h('a', { href: '#/trainer/' + t.level + suffix }, 'Тренажёр · уровень ' + t.level), ' › задача ' + (i + 1) + ' из ' + lt.length, filtered ? h('span.tag.cmd-tag', { title: 'Включён фильтр по командам — листаются только отобранные задачи' }, I('filter', 12), cmds.map(function (id) { return CMD_NAME[id]; }).join(' + ')) : null));
     page.appendChild(A.taskBox(t, { kind: 'trainer', xp: C.config.xp.trainer[t.level - 1], tag: 'Тренажёр', title: t.title, why: 'за задачу тренажёра', minLines: 6, showPack: P.all().length > 1 }));
-    page.appendChild(h('div.lesson-nav',
+    page.appendChild(h('div.lesson-nav', { 'data-guide': 'task-nav' },
       i > 0 ? h('a.btn', { href: '#/t/' + encodeURIComponent(lt[i - 1].id) }, [I('arrow-left', 18), 'Предыдущая']) : h('span'),
       h('a.btn.ghost.nav-mid', { href: '#/trainer/' + t.level + suffix, title: 'Все задачи уровня' }, I('list', 18), h('span.bl', 'Все задачи')),
       i < lt.length - 1 ? h('a.btn.primary', { href: '#/t/' + encodeURIComponent(lt[i + 1].id) }, ['Следующая', I('arrow-right', 18)]) : h('a.btn.primary', { href: '#/trainer/' + Math.min(t.level + 1, C.trainer.levels.length) + suffix }, ['Следующий уровень', I('arrow-right', 18)])));
@@ -553,17 +554,17 @@
     var page = h('div.page.wide'); view.appendChild(page);
     var dbSel = h('select.inp.db-sel', { title: 'Текущая база данных (как в SSMS). Можно переключать командой USE ИмяБазы;' }, P.all().filter(function (p) { return packs.indexOf(p) >= 0; }).map(function (p) { return h('option', { value: p.id }, p.dbName + ' — ' + p.title); }));
     dbSel.value = cur.id;
-    page.appendChild(h('div.card-head', h('h1', 'Песочница'), h('div.sb-tools', h('label.inline.db-pick', I('database', 18), dbSel), U.info('Как пользоваться песочницей', function () { return h('p', 'Свободные запросы к учебной базе. F5 / Ctrl+Enter — выполнить; выделите часть текста, чтобы выполнить только её.' + (P.all().length > 1 ? ' К таблице другой базы обращайтесь по полному имени ' : ''), P.all().length > 1 ? [h('code', 'ИмяБазы.dbo.Таблица'), ' (базы: ' + P.all().map(function (p) { return p.dbName; }).join(', ') + ') или переключайтесь командой ', h('code', 'USE ИмяБазы;'), '.'] : null); }))));
+    page.appendChild(h('div.card-head', h('h1', 'Песочница'), h('div.sb-tools', h('label.inline.db-pick', { 'data-guide': 'db-pick' }, I('database', 18), dbSel), U.info('Как пользоваться песочницей', function () { return h('p', 'Свободные запросы к учебной базе. F5 / Ctrl+Enter — выполнить; выделите часть текста, чтобы выполнить только её.' + (P.all().length > 1 ? ' К таблице другой базы обращайтесь по полному имени ' : ''), P.all().length > 1 ? [h('code', 'ИмяБазы.dbo.Таблица'), ' (базы: ' + P.all().map(function (p) { return p.dbName; }).join(', ') + ') или переключайтесь командой ', h('code', 'USE ИмяБазы;'), '.'] : null); }))));
     var lay = h('div.sandbox'); page.appendChild(lay);
-    var main = h('div.sb-main'), res = h('div.task-res'), pvArea = h('div.tw-preview');
+    var main = h('div.sb-main'), res = h('div.task-res', { 'data-guide': 'result' }), pvArea = h('div.tw-preview');
     var ed, side;
     lay.appendChild(main);
     function drawSide() {
-      var ns = h('div.tw-side.sb-side', G.SchemaPanel.create(cur, { onPick: function (name) { ed.insert(name); ed.focus(); }, onPreview: function (name) { A.showPreviewIn(pvArea, cur, name); } }).el);
+      var ns = h('div.tw-side.sb-side', { 'data-guide': 'schema-panel' }, G.SchemaPanel.create(cur, { onPick: function (name) { ed.insert(name); ed.focus(); }, onPreview: function (name) { A.showPreviewIn(pvArea, cur, name); } }).el);
       if (side) lay.replaceChild(ns, side); else lay.appendChild(ns); side = ns;
       U.clear(pvArea);
     }
-    var sel = h('select.inp');
+    var sel = h('select.inp', { title: 'Готовые примеры запросов к этой базе', 'data-guide': 'examples' });
     function drawExamples() {
       U.clear(sel);
       sel.appendChild(h('option', { value: '' }, cur.examples.length ? 'Вставить пример…' : 'Примеров нет'));
@@ -578,8 +579,16 @@
     dbSel.addEventListener('change', function () { setCur(A.pack(dbSel.value)); });
     var save = U.debounce(function () { u.sandbox = ed.getValue(); A.save(); }, 800);
     ed = G.Editor.create(main, { value: u.sandbox, minLines: 10, maxLines: 30, schema: cur.tables, onRun: function (s) { run(s.sql); }, onChange: save });
-    main.appendChild(h('div.task-btns', h('button.btn.primary', { onclick: function () { ed.run(); }, title: 'Выполнить (F5 или Ctrl+Enter)' }, I('play', 16), 'Выполнить'), h('button.btn', { onclick: function () { run(ed.getValue(), true); }, title: 'Выполнить по шагам: FROM → WHERE → GROUP BY → …' }, I('list', 18), 'Пошагово'),
-      h('button.btn.ghost.aux.m-only', { title: 'Схема базы', onclick: function () { A.schemaSheet(cur, function (text) { ed.insert(text); }); } }, I('schema', 18), h('span.bl', 'Схема')), sel));
+    ed.el.setAttribute('data-guide', 'editor');
+    // для экскурсии «Таблица результата»: если редактор пуст — подставить простой запрос; затем выполнить
+    A.sandboxDemo = function () {
+      if (!document.body.contains(lay)) return false;
+      if (!ed.getValue().trim()) ed.setValue('SELECT TOP (20) *\nFROM ' + cur.tables[0].name + ';');
+      run(ed.getValue());
+      return true;
+    };
+    main.appendChild(h('div.task-btns', h('button.btn.primary', { onclick: function () { ed.run(); }, title: 'Выполнить (F5 или Ctrl+Enter). Если выделить часть текста — выполнится только она', 'data-guide': 'run' }, I('play', 16), 'Выполнить'), h('button.btn', { onclick: function () { run(ed.getValue(), true); }, title: 'Выполнить по шагам: FROM → WHERE → GROUP BY → …', 'data-guide': 'trace' }, I('list', 18), 'Пошагово'),
+      h('button.btn.ghost.aux.m-only', { title: 'Схема базы: таблицы и столбцы', 'data-guide': 'schema-btn', onclick: function () { A.schemaSheet(cur, function (text) { ed.insert(text); }); } }, I('schema', 18), h('span.bl', 'Схема')), sel));
     main.appendChild(pvArea);
     main.appendChild(res);
     drawSide(); drawExamples();
@@ -603,13 +612,13 @@
     var pack = pid && A.pack(pid) ? A.pack(pid) : packs[0];
     var page = h('div.page.wide'); view.appendChild(page);
     if (packs.length > 1) {
-      var tabs = h('div.chips.pack-chips');
+      var tabs = h('div.chips.pack-chips', { 'data-guide': 'pack-chips' });
       packs.forEach(function (p) { tabs.appendChild(h('a.chip' + (p === pack ? '.on' : ''), { href: '#/schema/' + p.id }, I.pack(p, 'sm'), p.title)); });
       page.appendChild(tabs);
     }
     var cnt = G.PackFormat.counts(pack);
     page.appendChild(h('div.card-head', h('div', h('h1', pack.title), h('div.muted.small', 'база ' + pack.dbName + ' · ' + cnt.tables + ' ' + U.plural(cnt.tables, 'таблица', 'таблицы', 'таблиц') + ' · ' + (pack.rowCount || 0).toLocaleString('ru-RU') + ' строк')), I.pack(pack, 'lg')));
-    if (pack.description) page.appendChild(U.more(['Описание и правила расчёта', 'Скрыть описание'], function () { return richHtml(pack.description); }));
+    if (pack.description) { var dsc = U.more(['Описание и правила расчёта', 'Скрыть описание'], function () { return richHtml(pack.description); }); dsc.setAttribute('data-guide', 'schema-desc'); page.appendChild(dsc); }
     var erd = A.erd(pack);
     page.appendChild(erd.el);
     setTimeout(erd.draw, 30);
@@ -617,7 +626,7 @@
     var onR = U.debounce(function () { if (!document.body.contains(erd.el)) { window.removeEventListener('resize', onR); return; } erd.draw(); }, 100);
     window.addEventListener('resize', onR);
     if (pack.relations.length) {
-      var rel = h('div.card.pad', h('h3', 'Связи между таблицами'));
+      var rel = h('div.card.pad', { 'data-guide': 'relations' }, h('h3', 'Связи между таблицами'));
       pack.relations.forEach(function (r) { rel.appendChild(h('div', h('code', r[0]), ' → ', h('code', r[1]))); });
       page.appendChild(rel);
     }
@@ -628,14 +637,14 @@
     var page = h('div.page'); view.appendChild(page);
     page.appendChild(h('h1', 'Справочник T-SQL (SELECT)'));
     page.appendChild(h('p.muted', 'Короткие шпаргалки по всем темам курса. Примеры написаны для базы Bank (Учебный банк). Нажмите «Копировать», чтобы вставить пример в песочницу или SSMS.'));
-    var toc = h('div.chips'); page.appendChild(toc);
+    var toc = h('div.chips', { 'data-guide': 'cheat-toc' }); page.appendChild(toc);
     (G.CHEAT || []).forEach(function (sec, i) {
       var id = 'cs' + i;
       toc.appendChild(h('a.chip', { href: '#/cheat', onclick: function (e) { e.preventDefault(); U.qs('#' + id).scrollIntoView({ behavior: 'smooth' }); } }, sec.title));
       var card = h('div.card.pad.cheat#' + id, h('h2', sec.title));
       sec.items.forEach(function (it) {
         var p = h('pre.code'); p.innerHTML = G.highlightSQL(it.sql);
-        card.appendChild(h('div.cheat-item', h('div.ci-h', h('b', it.h), h('button.btn.small.ghost', { onclick: function () { U.copy(it.sql).then(function (ok) { if (ok) U.toast('Скопировано', 'ok', 1200); else U.toast('Не удалось скопировать — выделите текст примера и нажмите Ctrl+C', 'warn', 4500); }); } }, 'Копировать')), p, it.note ? richHtml(it.note) : null));
+        card.appendChild(h('div.cheat-item', h('div.ci-h', h('b', it.h), h('button.btn.small.ghost', { title: 'Скопировать пример — вставьте его в песочницу', 'data-guide': 'cheat-copy', onclick: function () { U.copy(it.sql).then(function (ok) { if (ok) U.toast('Скопировано', 'ok', 1200); else U.toast('Не удалось скопировать — выделите текст примера и нажмите Ctrl+C', 'warn', 4500); }); } }, 'Копировать')), p, it.note ? richHtml(it.note) : null));
       });
       page.appendChild(card);
     });

@@ -156,7 +156,7 @@
       catch (e) { console.error(e); fileInp.value = ''; U.toast('Не удалось прочитать файл: ' + U.esc(e && e.message || e), 'err', 7000); }
     });
     page.appendChild(h('div.card-head', h('h1', 'Учебные базы'),
-      h('div.row-btns',
+      h('div.row-btns', { 'data-guide': 'packs-tools' },
         h('button.icon-btn', { onclick: function () { reload('Список баз обновлён', true); }, title: S.dir ? 'Обновить: перечитать папку schemas' : 'Обновить: перечитать schemas/index.js', 'aria-label': 'Обновить' }, I('refresh')),
         h('button.btn.primary', { onclick: function () { dirInp.click(); }, title: 'Папка одной базы или вся папка schemas' }, I('plus', 18), 'Добавить базу'),
         h('button.icon-btn', { title: 'Ещё', 'aria-label': 'Ещё', onclick: moreMenu }, I('more')), dirInp, fileInp)));
@@ -171,7 +171,7 @@
     var active = P.activeIds(u);
     P.all().forEach(function (p) {
       var cnt = PF.counts(p), on = active.indexOf(p.id) >= 0;
-      var card = h('div.card.pad.pack-card' + (on ? '.on' : ''));
+      var card = h('div.card.pad.pack-card' + (on ? '.on' : ''), { 'data-guide': 'pack-card' });
       var cb = h('input', { type: 'checkbox' }); cb.checked = on;
       cb.addEventListener('change', function () {
         if (!cb.checked && P.activeIds(u).length <= 1) { cb.checked = true; U.toast('Должна быть выбрана хотя бы одна база', 'warn'); return; }
@@ -187,16 +187,16 @@
       card.appendChild(h('div.pc-top',
         I.pack(p, 'lg'),
         h('div.pc-main', h('h3', p.title, h('span.badge', p.dbName)), h('div.muted.small', sourceText(p) + (p.author ? ' · автор: ' + p.author : '') + (p.version ? ' · версия ' + p.version : ''))),
-        h('label.switch', cb, h('span', 'Изучаю'))));
+        h('label.switch', { 'data-guide': 'pack-switch', title: 'Изучаю: уроки и задачи этой базы появятся на главной и в тренажёре' }, cb, h('span', 'Изучаю'))));
       if (p.description) card.appendChild(U.more(['Описание базы', 'Скрыть описание'], function () { return A.richHtml(p.description); }));
       card.appendChild(h('div.pc-stats', stats.map(function (x) { return h('span.tag', x); })));
       if (p.errors.length) card.appendChild(h('div.fb.bad.small', h('b', 'Ошибок при загрузке: ' + p.errors.length + '. '), p.errors.slice(0, 3).map(function (e) { return h('div', e.where + ': ' + e.msg); }), p.errors.length > 3 ? h('div', '…') : null));
       else if (p.warnings.length) card.appendChild(h('div.muted.small', 'Замечаний: ' + p.warnings.length + ' — нажмите «Проверить», чтобы посмотреть.'));
-      card.appendChild(h('div.row-btns',
+      card.appendChild(h('div.row-btns', { 'data-guide': 'pack-actions' },
         h('a.btn.small', { href: '#/schema/' + p.id }, I('schema', 16), 'Схема'),
         h('a.btn.small', { href: '#/sandbox/' + p.id }, I('terminal', 16), 'Песочница'),
         cnt.trainer ? h('a.btn.small', { href: '#/trainer/0/' + p.id }, I('target', 16), 'Тренажёр') : null,
-        h('button.btn.small.ghost', { onclick: function () { A.showPackReport(p); } }, I('check-circle', 16), 'Проверить'),
+        h('button.btn.small.ghost', { title: 'Проверить базу: выполнить все эталонные решения и показать ошибки', onclick: function () { A.showPackReport(p); } }, I('check-circle', 16), 'Проверить'),
         p.source === 'import' && S.mode === 'fs' ? h('button.btn.small.ghost', {
           onclick: async function () { try { await S.writePack(p.localName, p.rawFiles); await S.removeLocalPack(p.localName); await reload('База скопирована в папку schemas/' + U.esc(p.localName)); } catch (e) { U.toast('Не удалось: ' + U.esc(e.message), 'err'); } }
         }, 'Перенести в папку курса') : null,
@@ -209,7 +209,7 @@
       page.appendChild(h('div.card.pad.err-card', h('h3', 'Не удалось загрузить'),
         h('ul.rep-list', P.failed.map(function (f) { return h('li', h('b', f.name + ': '), f.msg); }))));
     }
-    page.appendChild(h('div.card.pad', h('div.card-head', h('h3', 'Как добавить свою базу'), I('help', 20)), U.more('Показать шаги', h('ol.steps-list',
+    page.appendChild(h('div.card.pad', { 'data-guide': 'pack-howto' }, h('div.card-head', h('h3', 'Как добавить свою базу'), I('help', 20)), U.more('Показать шаги', h('ol.steps-list',
         h('li', 'Подготовьте папку базы: ', h('code', 'schema.json'), ' (таблицы и столбцы), ', h('code', 'data/ИмяТаблицы.csv'), ' (данные) и, по желанию, ', h('code', 'tasks.json'), ' (практикум), ', h('code', 'trainer.json'), ' (тренажёр), ', h('code', 'examples.json'), ' (примеры для песочницы), ', h('code', 'course.json'), ' (уроки). Образец — папка ', h('code', 'schemas/_шаблон'), ', полное описание — ', h('code', 'schemas/ФОРМАТ.md'), '.'),
         h('li', S.readonly && S.dir ? ['Папка курса подключена только для чтения: базы из ', h('code', S.folderName() + '/schemas/'), ' загружаются, но записать туда новую базу курс не может. Скопируйте папку базы в schemas вручную (в Проводнике) и нажмите «Обновить» — или нажмите «Добавить базу», тогда она сохранится только в этом браузере.'] : S.mode === 'fs' ? ['Скопируйте папку в ', h('code', (S.folderName() || 'папка курса') + '/schemas/'), ' и нажмите «Обновить» — или нажмите «Добавить базу» и выберите папку: курс сам скопирует её в schemas. База станет доступна всем, кто работает с этой папкой курса.'] : ['Нажмите «Добавить базу» и выберите папку базы. Она сохранится в этом браузере. Чтобы база была у всей группы, подключите папку курса (Chrome/Edge) и положите базу в ', h('code', 'schemas/'), '.']),
         h('li', 'Нажмите «Проверить задания» у новой базы: курс выполнит все эталоны и покажет ошибки.'),
