@@ -295,7 +295,15 @@
   T.parseDateStr = parseDateStr;
 
   /* ---------------- Сравнение строк (Cyrillic_General_CI_AS) ---------------- */
-  var collator = (typeof Intl !== 'undefined') ? new Intl.Collator('ru', { sensitivity: 'accent' }) : null;
+  // Порядок как в SQL Server: знаки, цифры, латиница, затем кириллица. Локаль 'ru' ставит кириллицу
+  // впереди латиницы, поэтому берём порядок без перестановки алфавитов (в нём русские буквы идут так же).
+  var collator = null;
+  if (typeof Intl !== 'undefined') {
+    ['en', 'ru'].some(function (loc) {
+      try { var c = new Intl.Collator(loc, { sensitivity: 'accent' }); if (!collator || c.compare('z', 'а') < 0) collator = c; return c.compare('z', 'а') < 0; }
+      catch (e) { return false; }
+    });
+  }
   function rtrim(s) { return s.replace(/ +$/, ''); }
   function lowerKey(s) { return rtrim(s).toLowerCase(); }
   T.lowerKey = lowerKey;

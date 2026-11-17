@@ -712,12 +712,12 @@ label.inline.mt { display: flex; margin-top: 12px; font-size: 14px; color: var(-
 .intro-row p { margin: 6px 0; }
 @media (max-width: 767px) {
   .m-only { display: inline-flex !important; }
-  .task-btns .sec .bl { display: none; }
-  .task-btns .btn.sec { width: 46px; min-width: 46px; height: 42px; padding: 0; flex: 0 0 46px; background: var(--surface-2); color: var(--muted); order: 2; }
-  .task-btns .btn.sec.on { background: var(--primary-soft); color: var(--primary); }
+  .task-btns .aux .bl { display: none; }
+  .task-btns .btn.aux { width: 46px; min-width: 46px; height: 42px; padding: 0; flex: 0 0 46px; background: var(--surface-2); color: var(--muted); order: 2; }
+  .task-btns .btn.aux.on { background: var(--primary-soft); color: var(--primary); }
   .task-btns .btn.run, .task-btns .btn.primary { flex: 1 1 45%; }
   .step-of { display: none; }
-  .task-btns > .btn:not(.sec) { order: 1; }
+  .task-btns > .btn:not(.aux) { order: 1; }
   .task-btns select.inp { order: 3; }
   .lesson-nav .nav-mid .bl { display: none; }
   .lesson-nav .nav-mid { flex: 0 0 46px !important; padding: 0; }

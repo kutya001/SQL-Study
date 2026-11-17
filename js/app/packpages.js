@@ -144,11 +144,17 @@
     var dirInp = h('input', { type: 'file', webkitdirectory: true, multiple: true, style: { display: 'none' } });
     var fileInp = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' } });
     dirInp.addEventListener('change', async function () {
-      var groups = await readPicked(dirInp.files); dirInp.value = '';
-      if (!groups.length) { U.toast('В выбранной папке нет баз: нужен schema.json (в папке базы или в её подпапках)', 'warn', 6000); return; }
-      if (groups.length === 1) await addPicked(groups[0].name, groups[0].files); else await addMany(groups);
+      try {
+        var groups = await readPicked(dirInp.files); dirInp.value = '';
+        if (!groups.length) { U.toast('В выбранной папке нет баз: нужен schema.json (в папке базы или в её подпапках)', 'warn', 6000); return; }
+        if (groups.length === 1) await addPicked(groups[0].name, groups[0].files); else await addMany(groups);
+      } catch (e) { console.error(e); dirInp.value = ''; U.toast('Не удалось прочитать папку: ' + U.esc(e && e.message || e), 'err', 7000); }
     });
-    fileInp.addEventListener('change', async function () { var f = fileInp.files[0]; fileInp.value = ''; if (!f) return; await addPicked(f.name.replace(/\.json$/i, ''), { 'schema.json': await f.text() }); });
+    fileInp.addEventListener('change', async function () {
+      var f = fileInp.files[0]; if (!f) return;
+      try { var text = await f.text(); fileInp.value = ''; await addPicked(f.name.replace(/\.json$/i, ''), { 'schema.json': text }); }
+      catch (e) { console.error(e); fileInp.value = ''; U.toast('Не удалось прочитать файл: ' + U.esc(e && e.message || e), 'err', 7000); }
+    });
     page.appendChild(h('div.card-head', h('h1', 'Учебные базы'),
       h('div.row-btns',
         h('button.icon-btn', { onclick: function () { reload('Список баз обновлён', true); }, title: S.dir ? 'Обновить: перечитать папку schemas' : 'Обновить: перечитать schemas/index.js', 'aria-label': 'Обновить' }, I('refresh')),

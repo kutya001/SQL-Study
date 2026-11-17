@@ -81,7 +81,7 @@
 
   /* ---------------- CSV ---------------- */
   PF.parseCSV = function (text) {
-    text = String(text || '').replace(/^﻿/, '');
+    text = String(text || '').replace(/^\uFEFF/, '');
     // разделитель — по первой строке: ; , или табуляция
     var first = text.split(/\r?\n/)[0] || '';
     var cnt = { ';': 0, ',': 0, '\t': 0 }, inQ = false;
@@ -479,7 +479,7 @@
       '   Не редактируйте вручную: курс пересобирает файл сам, когда папка курса подключена с записью,\n' +
       '   или нажмите «Скачать index.js» на странице «Базы». Исходники баз — папки рядом с этим файлом. */\n' +
       'window.SQLKURS_BUNDLE = {"sig":' + JSON.stringify(sig) + ',"built":' + JSON.stringify(builtAt || new Date().toISOString()) + ',"packs":' + body + '};\n';
-    return { sig: sig, text: text, count: packs.length };
+    return { sig: sig, text: text, count: packs.length, packs: packs };
   };
 
   /* ---------------- Счётчики ---------------- */

@@ -49,10 +49,13 @@
   G.Editor = {
     create: function (container, opts) {
       opts = opts || {};
+      // на телефоне нет F5 и Ctrl+Enter — подсказка в пустом редакторе говорит о кнопке
+      var touch = false;
+      try { touch = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches); } catch (e) { }
       var wrap = h('div.editor');
       var gutter = h('div.ed-gutter');
       var pre = h('pre.ed-hl', { 'aria-hidden': 'true' });
-      var ta = h('textarea.ed-ta', { spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off', wrap: 'off', placeholder: opts.placeholder || 'Напишите запрос и нажмите F5 или Ctrl+Enter' });
+      var ta = h('textarea.ed-ta', { spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off', wrap: 'off', placeholder: opts.placeholder || (touch ? 'Напишите запрос и нажмите «Выполнить»' : 'Напишите запрос и нажмите F5 или Ctrl+Enter') });
       var area = h('div.ed-area', pre, ta);
       var pop = h('div.ed-pop');
       wrap.appendChild(gutter); wrap.appendChild(area); wrap.appendChild(pop);
