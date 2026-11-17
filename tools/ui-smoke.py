@@ -56,12 +56,39 @@ async def scenario(browser, url, tag, errors):
     found = await pg.evaluate("App.user.settings.trainerCmds.join(',') + ':' + document.querySelectorAll('.tr-row').length")
     assert found.startswith('having:') and int(found.split(':')[1]) >= 1, f'{tag}: фильтр тренажёра по командам не работает: {found}'
     await pg.locator('.cmd-reset').click(); await pg.wait_for_timeout(300)
+    # оформление: окно с палитрами, смена палитры и темы
+    await pg.locator('.tb-pal').click(); await pg.wait_for_timeout(400)
+    cards = await pg.locator('.modal .pal-card').count()
+    assert cards == len(await pg.evaluate("App.PALETTES")) and cards >= 2, f'{tag}: в окне оформления не все палитры: {cards}'
+    before = await pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--primary').trim()")
+    await pg.locator('.modal .pal-card[data-palette="amber"]').click(); await pg.wait_for_timeout(500)
+    await pg.locator('.modal .theme-seg .seg-btn[data-theme-val="dark"]').click(); await pg.wait_for_timeout(500)
+    look = await pg.evaluate("""(() => {
+      const d = document.documentElement;
+      return { pal: d.getAttribute('data-palette'), theme: d.getAttribute('data-theme'), primary: getComputedStyle(d).getPropertyValue('--primary').trim(),
+        saved: App.user.settings.palette + '/' + App.user.settings.theme, on: document.querySelector('.modal .pal-card.on').getAttribute('data-palette') };
+    })()""")
+    assert look['pal'] == 'amber' and look['theme'] == 'dark' and look['primary'] != before and look['saved'] == 'amber/dark' and look['on'] == 'amber', f'{tag}: палитра или тема не переключились: {look}'
+    await pg.keyboard.press('Escape'); await pg.wait_for_timeout(200)
+    # у каждой палитры из списка есть свои цвета в стилях — и для светлой, и для тёмной темы
+    uniq = await pg.evaluate("""(() => {
+      const d = document.documentElement, keep = [d.getAttribute('data-theme'), d.getAttribute('data-palette')], out = {};
+      for (const t of ['light', 'dark']) {
+        d.setAttribute('data-theme', t);
+        out[t] = new Set(App.PALETTES.map(p => { d.setAttribute('data-palette', p.id); const cs = getComputedStyle(d); return cs.getPropertyValue('--primary') + cs.getPropertyValue('--grad') + cs.getPropertyValue('--bg'); })).size;
+      }
+      d.setAttribute('data-theme', keep[0]); d.setAttribute('data-palette', keep[1]);
+      return out;
+    })()""")
+    assert uniq['light'] == cards and uniq['dark'] == cards, f'{tag}: у части палитр нет своих цветов в css/app.css: {uniq}'
     xp = await pg.evaluate("App.user.xp")
     await pg.reload(); await pg.wait_for_timeout(1200)
+    early = await pg.evaluate("document.documentElement.getAttribute('data-palette') + '/' + document.documentElement.getAttribute('data-theme')")
+    assert early == 'amber/dark', f'{tag}: оформление не восстановилось после перезагрузки: {early}'
     await pg.locator('.continue-btn').click(); await pg.wait_for_timeout(1000)
     xp2 = await pg.evaluate("App.user.xp")
     assert xp2 == xp and xp > 0, f'{tag}: прогресс не сохранился ({xp} → {xp2})'
-    print(f'  {tag}: базы {", ".join(packs)}; задача засчитана; таблица, схема и фильтр тренажёра работают; XP {xp} сохранился после перезагрузки')
+    print(f'  {tag}: базы {", ".join(packs)}; задача засчитана; таблица, схема, фильтр тренажёра и смена палитры работают; XP {xp} сохранился после перезагрузки')
     await ctx.close()
 
 async def main():

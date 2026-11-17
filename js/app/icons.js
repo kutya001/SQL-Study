@@ -93,6 +93,7 @@
     'zoom-out': '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5M8.5 11h5"/>',
     fit: '<rect x="7.5" y="7.5" width="9" height="9" rx="2"/><path d="M4 8.5V4h4.5M20 8.5V4h-4.5M4 15.5V20h4.5M20 15.5V20h-4.5"/>',
     undo: '<path d="M8 5L4 9l4 4"/><path d="M4 9h10a5.5 5.5 0 0 1 0 11h-4"/>',
+    palette: '<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.3 0 2-.9 2-1.9 0-.6-.3-1-.6-1.4-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.9-1.8h1.9a3.8 3.8 0 0 0 3.8-3.8c0-3.8-3.8-6.8-8.5-6.8z"/><circle cx="7.7" cy="11.3" r="1.1" fill="currentColor" stroke="none"/><circle cx="10.3" cy="7.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.8" cy="7.6" r="1.1" fill="currentColor" stroke="none"/>',
     hand: '<path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11m0-5.5V5a1.5 1.5 0 0 1 3 0v6m0-4.5a1.5 1.5 0 0 1 3 0V12m0-2a1.5 1.5 0 0 1 3 0v4.5c0 3.6-2.7 6-6.5 6-2.6 0-4-.9-5.4-2.9L5 13.5c-.7-1-.2-2.1.7-2.4.8-.3 1.6 0 2.3.9z"/>'
   };
 
@@ -113,8 +114,9 @@
   // Значок учебной базы: из поля icon (имя значка или эмодзи) или по id
   var PACK_EMOJI = { '🏦': 'bank', '🛒': 'cart', '🧵': 'shirt', '👕': 'shirt', '📦': 'package', '📚': 'books', '🗄️': 'database', '🗄': 'database', '🏥': 'shield', '🚗': 'package', '🏭': 'layers' };
   var PACK_ID = { bank: 'bank', shop: 'cart', sewing: 'shirt', cargo: 'package', library: 'books' };
-  var PACK_HUE = { bank: '#5b5bf0', shop: '#0fa38a', sewing: '#e0457b', cargo: '#e8890c', library: '#7c5cff' };
-  var PALETTE = ['#5b5bf0', '#0fa38a', '#e0457b', '#e8890c', '#7c5cff', '#0b8bd6', '#c2410c', '#16a34a'];
+  // Цвета плиток баз. Встроенный банк берёт основной цвет выбранной палитры (var(--accent)), остальные — постоянные.
+  var PACK_HUE = { bank: 'var(--accent)', shop: '#0fa38a', sewing: '#d2552b', cargo: '#e8890c', library: '#0b8bd6' };
+  var PALETTE = ['#2468e8', '#0fa38a', '#d2552b', '#e8890c', '#0b8bd6', '#16a34a', '#b7791f', '#475569'];
   Icon.packName = function (p) {
     var ic = p && p.icon ? String(p.icon).trim() : '';
     if (P[ic]) return ic;
