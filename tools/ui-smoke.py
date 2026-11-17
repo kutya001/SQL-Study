@@ -5,7 +5,8 @@
     python3 tools/ui-smoke.py --show     # то же, с видимым окном браузера
 
 Проверяет: стартовую страницу, хранение в браузере, вход, решение задачи тренажёра,
-загрузку учебных баз из schemas/index.js, песочницу с USE, сохранение после перезагрузки
+загрузку учебных баз из schemas/index.js, песочницу с USE, таблицу результата (общий компонент),
+схему на canvas, фильтр тренажёра по командам, сохранение после перезагрузки
 и отсутствие ошибок в консоли.
 """
 import asyncio, os, subprocess, sys, tempfile, time, pathlib
@@ -34,12 +35,33 @@ async def scenario(browser, url, tag, errors):
     await pg.goto(url + '#/sandbox/sewing'); await pg.wait_for_timeout(500)
     await pg.locator('textarea.ed-ta').first.fill("USE Cargo;\nSELECT COUNT(*) AS N FROM Shipments;")
     await pg.locator('.task-btns .btn.primary').first.click(); await pg.wait_for_timeout(600)
+    # таблица результата — общий компонент: сортировка из кода и фильтр по значению
+    grid = await pg.evaluate("""(() => {
+      const el = document.querySelector('.res-pane .dg'); if (!el || !el.dataGrid) return null;
+      return { rows: el.dataGrid.view.length, head: el.querySelectorAll('th .th-f').length };
+    })()""")
+    assert grid and grid['rows'] == 1 and grid['head'] == 1, f'{tag}: таблица результата не на общем компоненте: {grid}'
+    # схема базы рисуется на canvas
+    await pg.goto(url + '#/schema/bank'); await pg.wait_for_timeout(900)
+    erd = await pg.evaluate("""(() => {
+      const c = document.querySelector('.erdc-canvas'); if (!c) return null;
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0;
+      for (let i = 3; i < d.length; i += 4000) if (d[i] > 0) n++;
+      return { painted: n, tables: window.__erdLast.nodes.length, links: window.__erdLast.edges.length };
+    })()""")
+    assert erd and erd['painted'] > 30 and erd['tables'] == 9 and erd['links'] == 8, f'{tag}: схема не нарисована: {erd}'
+    # тренажёр: фильтр по командам
+    await pg.goto(url + '#/trainer/0/bank'); await pg.wait_for_timeout(500)
+    await pg.locator('.chip.cmd', has_text='HAVING').first.click(); await pg.wait_for_timeout(400)
+    found = await pg.evaluate("App.user.settings.trainerCmds.join(',') + ':' + document.querySelectorAll('.tr-row').length")
+    assert found.startswith('having:') and int(found.split(':')[1]) >= 1, f'{tag}: фильтр тренажёра по командам не работает: {found}'
+    await pg.locator('.cmd-reset').click(); await pg.wait_for_timeout(300)
     xp = await pg.evaluate("App.user.xp")
     await pg.reload(); await pg.wait_for_timeout(1200)
     await pg.locator('.continue-btn').click(); await pg.wait_for_timeout(1000)
     xp2 = await pg.evaluate("App.user.xp")
     assert xp2 == xp and xp > 0, f'{tag}: прогресс не сохранился ({xp} → {xp2})'
-    print(f'  {tag}: базы {", ".join(packs)}; задача засчитана; XP {xp} сохранился после перезагрузки')
+    print(f'  {tag}: базы {", ".join(packs)}; задача засчитана; таблица, схема и фильтр тренажёра работают; XP {xp} сохранился после перезагрузки')
     await ctx.close()
 
 async def main():

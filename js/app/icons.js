@@ -86,7 +86,14 @@
     filter: '<path d="M4 5h16l-6.2 7.4V19l-3.6-1.8v-4.8z"/>',
     send: '<path d="M4 12L20 4l-6 16-2.5-6.5z"/><path d="M11.5 13.5L20 4"/>',
     grip: '<path d="M8 9h8M8 15h8"/>',
-    dot: '<circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>'
+    dot: '<circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>',
+    widen: '<path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/>',
+    narrow: '<path d="M3 12h6.5M21 12h-6.5M6 8l4 4-4 4M18 8l-4 4 4 4"/>',
+    'zoom-in': '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5M11 8.5v5M8.5 11h5"/>',
+    'zoom-out': '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5M8.5 11h5"/>',
+    fit: '<rect x="7.5" y="7.5" width="9" height="9" rx="2"/><path d="M4 8.5V4h4.5M20 8.5V4h-4.5M4 15.5V20h4.5M20 15.5V20h-4.5"/>',
+    undo: '<path d="M8 5L4 9l4 4"/><path d="M4 9h10a5.5 5.5 0 0 1 0 11h-4"/>',
+    hand: '<path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11m0-5.5V5a1.5 1.5 0 0 1 3 0v6m0-4.5a1.5 1.5 0 0 1 3 0V12m0-2a1.5 1.5 0 0 1 3 0v4.5c0 3.6-2.7 6-6.5 6-2.6 0-4-.9-5.4-2.9L5 13.5c-.7-1-.2-2.1.7-2.4.8-.3 1.6 0 2.3.9z"/>'
   };
 
   var NS = 'http://www.w3.org/2000/svg';

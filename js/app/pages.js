@@ -13,6 +13,8 @@
   function richHtml(html) {
     var d = h('div.rich', { html: html || '' });
     U.qsa('pre.sql', d).forEach(function (p) { var src = p.textContent.replace(/^\n/, ''); p.innerHTML = G.highlightSQL(src); p.classList.add('code'); });
+    // таблицы из текста урока — тот же общий компонент: фильтр, сортировка, выделение, ширина столбцов
+    U.qsa('table', d).forEach(function (t) { try { G.DataGrid.fromTable(t); } catch (e) { console.error(e); } });
     return d;
   }
   A.richHtml = richHtml;
@@ -401,6 +403,56 @@
   });
 
   /* ================= Тренажёр ================= */
+  // Команды SQL, по которым можно отбирать задачи: ищутся в эталонном решении (без комментариев и строк)
+  var CMDS = [
+    ['where', 'WHERE', /\bWHERE\b/i],
+    ['orderby', 'ORDER BY', /\bORDER\s+BY\b/i],
+    ['top', 'TOP / OFFSET', /\bTOP\b|\bOFFSET\b/i],
+    ['distinct', 'DISTINCT', /\bDISTINCT\b/i],
+    ['like', 'LIKE', /\bLIKE\b/i],
+    ['in', 'IN', /\bIN\s*\(/i],
+    ['between', 'BETWEEN', /\bBETWEEN\b/i],
+    ['null', 'NULL', /\bIS\s+(?:NOT\s+)?NULL\b|\b(?:ISNULL|COALESCE|NULLIF)\s*\(/i],
+    ['case', 'CASE / IIF', /\bCASE\b|\bIIF\s*\(/i],
+    ['join', 'JOIN', /\bJOIN\b/i],
+    ['leftjoin', 'LEFT JOIN', /\b(?:LEFT|RIGHT|FULL)\s+(?:OUTER\s+)?JOIN\b/i],
+    ['groupby', 'GROUP BY', /\bGROUP\s+BY\b/i],
+    ['having', 'HAVING', /\bHAVING\b/i],
+    ['agg', 'COUNT / SUM / AVG', /\b(?:COUNT|COUNT_BIG|SUM|AVG|MIN|MAX|STRING_AGG)\s*\(/i],
+    ['sub', 'Подзапрос', null],
+    ['exists', 'EXISTS', /\bEXISTS\b/i],
+    ['union', 'UNION / EXCEPT', /\b(?:UNION|EXCEPT|INTERSECT)\b/i],
+    ['cte', 'WITH (CTE)', /\bWITH\s+[\w\[\]]+\s*(?:\([^)]*\)\s*)?AS\s*\(/i],
+    ['over', 'OVER (окна)', /\bOVER\s*\(/i],
+    ['apply', 'APPLY', /\b(?:CROSS|OUTER)\s+APPLY\b/i],
+    ['date', 'Даты', /\b(?:DATEADD|DATEDIFF|DATEPART|DATENAME|YEAR|MONTH|DAY|EOMONTH|GETDATE|SYSDATETIME|DATEFROMPARTS|DATETRUNC)\s*\(/i],
+    ['str', 'Строки', /\b(?:LEN|UPPER|LOWER|LEFT|RIGHT|SUBSTRING|CHARINDEX|PATINDEX|REPLACE|CONCAT|CONCAT_WS|TRIM|LTRIM|RTRIM|STUFF|REVERSE|REPLICATE)\s*\(/i],
+    ['cast', 'CAST / CONVERT', /\b(?:TRY_)?(?:CAST|CONVERT)\s*\(|\bFORMAT\s*\(/i],
+    ['var', 'Переменные и #таблицы', /\bDECLARE\b|#\w+/i]
+  ];
+  var CMD_NAME = {}; CMDS.forEach(function (c) { CMD_NAME[c[0]] = c[1]; });
+  A.trainerCmds = CMDS.map(function (c) { return { id: c[0], title: c[1] }; });
+  // Какие команды есть в решении задачи: { where: 1, join: 1, … } (считается один раз)
+  A.taskCmds = function (t) {
+    if (t._cmds) return t._cmds;
+    var code = G.Checker.stripCode(t.solution || ''), out = {};
+    CMDS.forEach(function (c) {
+      // подзапрос — SELECT в скобках, но не тело CTE («WITH x AS (SELECT …)» — это отдельная команда)
+      var hit = c[2] ? c[2].test(code) : /\(\s*SELECT\b/i.test(code.replace(/\bAS\s*\(\s*SELECT\b/gi, ' '));
+      if (hit) out[c[0]] = 1;
+    });
+    Object.defineProperty(t, '_cmds', { value: out, enumerable: false });
+    return out;
+  };
+  // Выбранные команды (только существующие) и отбор задач по ним: в решении должны быть все выбранные
+  function cmdFilter() {
+    var list = (A.user.settings.trainerCmds || []).filter(function (id) { return CMD_NAME[id]; });
+    return list;
+  }
+  function byCmds(tasks, cmds) {
+    if (!cmds.length) return tasks;
+    return tasks.filter(function (t) { var tc = A.taskCmds(t); return cmds.every(function (id) { return tc[id]; }); });
+  }
   function trainerScope(pf) {
     var packs = A.activePacks().filter(function (p) { return p.trainer.length; });
     var cur = pf === 'all' ? null : (pf && A.pack(pf) ? pf : (A.user.settings.trainerPack && packs.some(function (p) { return p.id === A.user.settings.trainerPack; }) ? A.user.settings.trainerPack : null));
@@ -421,12 +473,38 @@
       page.appendChild(chips);
     }
     if (!tasks.length) { page.appendChild(h('div.card.pad', 'В выбранных базах нет задач тренажёра. ', h('a', { href: '#/packs' }, 'Выбрать другие базы'))); return; }
+    // --- фильтр по командам: остаются задачи, в решении которых есть все отмеченные команды
+    var cmds = cmdFilter(), allTasks = tasks;
+    tasks = byCmds(allTasks, cmds);
+    var setCmds = function (list) { A.user.settings.trainerCmds = list; A.save(); A.dispatch(); };
+    var cmdBox = h('div.cmd-filter', h('div.cmd-cap', I('filter', 15), h('span', 'Команды в решении'),
+      U.info('Фильтр по командам', function () { return h('div', h('p', 'Отметьте одну или несколько команд — останутся задачи, в эталонном решении которых есть все отмеченные. Например, ', h('code', 'WHERE'), ' + ', h('code', 'JOIN'), ' покажет задачи, где нужно и соединять таблицы, и отбирать строки.'), h('p.muted', 'Число на кнопке — сколько задач останется, если добавить эту команду. Ту же задачу часто можно решить и по-другому: фильтр смотрит только на эталон.')); })));
+    var cmdChips = h('div.chips.cmd-chips');
+    CMDS.forEach(function (c) {
+      var id = c[0], on = cmds.indexOf(id) >= 0;
+      var n = on ? tasks.length : byCmds(tasks, [id]).length;
+      if (!n && !on) return;
+      cmdChips.appendChild(h('button.chip.cmd' + (on ? '.on' : ''), { type: 'button', 'aria-pressed': on ? 'true' : 'false', title: on ? 'Убрать из фильтра' : 'Добавить в фильтр',
+        onclick: function () { setCmds(on ? cmds.filter(function (x) { return x !== id; }) : cmds.concat([id])); } }, c[1], h('span.chip-n', String(n))));
+    });
+    if (cmds.length) cmdChips.appendChild(h('button.chip.cmd-reset', { type: 'button', onclick: function () { setCmds([]); } }, I('x', 14), 'Сбросить'));
+    cmdBox.appendChild(cmdChips);
+    // на телефоне кнопки идут одной прокручиваемой строкой — показываем выбранную команду
+    if (cmds.length) setTimeout(function () {
+      var on = cmdChips.querySelector('.chip.on');
+      if (on && cmdChips.scrollWidth > cmdChips.clientWidth) cmdChips.scrollLeft = Math.max(0, on.offsetLeft - cmdChips.offsetLeft - 12);
+    }, 0);
+    if (cmds.length) cmdBox.appendChild(h('div.muted.small.cmd-sum', 'Найдено задач: ', h('b', String(tasks.length)), ' из ' + allTasks.length + ' — в решении есть ' + cmds.map(function (id) { return CMD_NAME[id]; }).join(' + ')));
+    page.appendChild(cmdBox);
     var levels = h('div.lvl-grid');
     var cur = lv ? +lv : 0;
     if (!cur) { cur = 1; for (var L = 1; L <= C.trainer.levels.length; L++) { var lt = tasks.filter(function (t) { return t.level === L; }); if (lt.some(function (t) { return !A.isDone(t.id); })) { cur = L; break; } } }
+    // на выбранном уровне под фильтр ничего не подошло — открываем первый уровень, где задачи есть
+    var hasTasks = function (lvl) { return tasks.some(function (t) { return t.level === lvl; }); };
+    if (!hasTasks(cur)) for (var L2 = 1; L2 <= C.trainer.levels.length; L2++) if (hasTasks(L2)) { cur = L2; break; }
     C.trainer.levels.forEach(function (info, i) {
       var n = i + 1, lt = tasks.filter(function (t) { return t.level === n; }), d = lt.filter(function (t) { return A.isDone(t.id); }).length;
-      levels.appendChild(h('a.lvl-card.l' + n + (n === cur ? '.active' : ''), { href: '#/trainer/' + n + suffix },
+      levels.appendChild(h('a.lvl-card.l' + n + (n === cur ? '.active' : '') + (!lt.length ? '.empty' : ''), { href: '#/trainer/' + n + suffix },
         h('div.lvl-n', 'Уровень ' + n), h('div.lvl-name', info.name), h('div.muted.small', info.desc),
         h('div.lvl-p', d + '/' + lt.length), h('div.pbar', h('div', { style: { width: (lt.length ? d * 100 / lt.length : 0) + '%' } }))));
     });
@@ -434,7 +512,7 @@
     var lt2 = tasks.filter(function (t) { return t.level === cur; });
     var unsolved = lt2.filter(function (t) { return !A.isDone(t.id); });
     page.appendChild(h('div.card-head', h('h2', 'Уровень ' + cur + ': ' + C.trainer.levels[cur - 1].name), unsolved.length ? h('a.btn', { href: '#/t/' + encodeURIComponent(unsolved[Math.floor(Math.random() * unsolved.length)].id) }, 'Случайная нерешённая') : (lt2.length ? h('span.badge.ok', 'уровень пройден') : null)));
-    if (!lt2.length) page.appendChild(h('p.muted', 'На этом уровне задач нет.'));
+    if (!lt2.length) page.appendChild(h('p.muted', cmds.length ? 'На этом уровне нет задач с выбранными командами — посмотрите другие уровни или уберите часть команд из фильтра.' : 'На этом уровне задач нет.'));
     var list = h('div.tr-list');
     var many = !sc.cur && sc.packs.length > 1;
     lt2.forEach(function (t, i) {
@@ -452,10 +530,13 @@
     if (!t) { A.go('#/trainer'); return; }
     var sc = trainerScope();
     var scopeTasks = sc.tasks.indexOf(t) >= 0 ? sc.tasks : A.pack(t.pack).trainer;
+    // если включён фильтр по командам и задача под него подходит — листаем только отобранные задачи
+    var cmds = cmdFilter(), fTasks = byCmds(scopeTasks, cmds), filtered = cmds.length > 0 && fTasks.indexOf(t) >= 0;
+    if (filtered) scopeTasks = fTasks;
     var lt = scopeTasks.filter(function (x) { return x.level === t.level; }), i = lt.indexOf(t);
     var suffix = '/' + (sc.tasks.indexOf(t) >= 0 ? (sc.cur || 'all') : t.pack);
     var page = h('div.page.task-page'); view.appendChild(page);
-    page.appendChild(h('div.crumbs', h('a', { href: '#/trainer/' + t.level + suffix }, 'Тренажёр · уровень ' + t.level), ' › задача ' + (i + 1) + ' из ' + lt.length));
+    page.appendChild(h('div.crumbs', h('a', { href: '#/trainer/' + t.level + suffix }, 'Тренажёр · уровень ' + t.level), ' › задача ' + (i + 1) + ' из ' + lt.length, filtered ? h('span.tag.cmd-tag', { title: 'Включён фильтр по командам — листаются только отобранные задачи' }, I('filter', 12), cmds.map(function (id) { return CMD_NAME[id]; }).join(' + ')) : null));
     page.appendChild(A.taskBox(t, { kind: 'trainer', xp: C.config.xp.trainer[t.level - 1], tag: 'Тренажёр', title: t.title, why: 'за задачу тренажёра', minLines: 6, showPack: P.all().length > 1 }));
     page.appendChild(h('div.lesson-nav',
       i > 0 ? h('a.btn', { href: '#/t/' + encodeURIComponent(lt[i - 1].id) }, [I('arrow-left', 18), 'Предыдущая']) : h('span'),
@@ -529,7 +610,6 @@
     var cnt = G.PackFormat.counts(pack);
     page.appendChild(h('div.card-head', h('div', h('h1', pack.title), h('div.muted.small', 'база ' + pack.dbName + ' · ' + cnt.tables + ' ' + U.plural(cnt.tables, 'таблица', 'таблицы', 'таблиц') + ' · ' + (pack.rowCount || 0).toLocaleString('ru-RU') + ' строк')), I.pack(pack, 'lg')));
     if (pack.description) page.appendChild(U.more(['Описание и правила расчёта', 'Скрыть описание'], function () { return richHtml(pack.description); }));
-    page.appendChild(h('p.muted.small.erd-hint', 'Линии — связи «внешний ключ → первичный ключ». Значок таблицы справа — посмотреть данные.'));
     var erd = A.erd(pack);
     page.appendChild(erd.el);
     setTimeout(erd.draw, 30);

@@ -258,7 +258,12 @@
           return '';
         }
       });
-      U.qsa('tbody tr', t).forEach(function (tr, i) { tr.style.cursor = 'pointer'; tr.addEventListener('click', function () { sel = i; draw(); }); });
+      // щелчок по строке выбирает её; номер берём из data-i — таблицу могли отсортировать или отфильтровать
+      t.querySelector('tbody').addEventListener('click', function (e) {
+        var tr = e.target.closest ? e.target.closest('tr') : null;
+        if (tr && tr.hasAttribute('data-i')) { sel = +tr.getAttribute('data-i'); draw(); }
+      });
+      t.classList.add('dg-rowpick');
       out.appendChild(sqlBox(sql));
       out.appendChild(t);
       out.appendChild(h('div.w-note', cur.note + (cur.frame === 'none' ? ' Подсвечена секция, внутри которой считается номер.' : '')));

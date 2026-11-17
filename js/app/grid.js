@@ -18,35 +18,15 @@
   };
   var G_COLORS = ['#4c6ef5', '#12b886', '#f59f00', '#e64980', '#7950f2', '#15aabf', '#fa5252', '#82c91e', '#fd7e14', '#be4bdb'];
 
+  // Таблица результата. Это общий компонент DataGrid (js/app/datagrid.js): фильтры, сортировка,
+  // выделение и копирование ячеек, перенос и ширина столбцов. opts: types, raw, rowClass(i), max, grid (свой класс).
   function table(cols, rows, kinds, opts) {
     opts = opts || {};
-    var max = opts.max || 500;
-    var wrap = h('div.grid-wrap');
-    var tbl = h('table.grid');
-    var thr = h('tr', h('th.rn', '#'));
-    cols.forEach(function (c, i) {
-      var noname = c === '(Отсутствует имя столбца)';
-      thr.appendChild(h('th' + (noname ? '.noname' : ''), { title: (opts.types && opts.types[i]) ? opts.types[i] : '' }, c));
-    });
-    tbl.appendChild(h('thead', thr));
-    var tb = h('tbody');
-    var lim = Math.min(rows.length, max);
-    for (var r = 0; r < lim; r++) {
-      var tr = h('tr', h('td.rn', String(r + 1)));
-      rows[r].forEach(function (v, i) {
-        var td = h('td');
-        if (v === null) { td.className = 'null'; td.textContent = 'NULL'; }
-        else { td.textContent = v; if (kinds && NUMK[kinds[i]]) td.className = 'num'; }
-        if (opts.rowClass) { var rc = opts.rowClass(r); if (rc) tr.classList.add(rc); }
-        tr.appendChild(td);
-      });
-      tb.appendChild(tr);
-    }
-    tbl.appendChild(tb);
-    wrap.appendChild(tbl);
-    if (!rows.length) wrap.appendChild(h('div.grid-empty', 'Строк нет'));
-    if (rows.length > lim) wrap.appendChild(h('div.grid-more', 'Показаны первые ' + lim + ' из ' + rows.length + ' строк.'));
-    return wrap;
+    var Cls = opts.grid || G.DataGrid.Mini;
+    var o = { columns: cols, rows: rows, kinds: kinds || null, types: opts.types || null, raw: opts.raw || null, rowClass: opts.rowClass || null };
+    if (opts.max) o.pageSize = Math.min(opts.max, 200);
+    if (opts.status !== undefined) o.status = opts.status;
+    return new Cls(o).el;
   }
 
   function errorBox(e) {
@@ -113,7 +93,7 @@
     if (res.results.length) {
       res.results.forEach(function (rs, i) {
         if (res.results.length > 1) resPane.appendChild(h('div.rs-title', 'Результат ' + (i + 1)));
-        resPane.appendChild(table(rs.columns, rs.rows, rs.kinds, { types: rs.types }));
+        resPane.appendChild(table(rs.columns, rs.rows, rs.kinds, { types: rs.types, raw: rs.raw, grid: G.DataGrid.Result }));
       });
     } else if (!res.error) resPane.appendChild(h('div.grid-empty', 'Запрос не вернул таблицу. Смотрите вкладку «Сообщения».'));
     if (res.error) resPane.appendChild(errorBox(res.error));
