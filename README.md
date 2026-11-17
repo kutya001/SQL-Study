@@ -101,6 +101,7 @@ progress/             папка для файлов прогресса в ре�
 ```bash
 node tools/validate-course.js      # все уроки, ДЗ, тренажёр и справочник: эталоны выполняются
 node tools/validate-packs.js       # все учебные базы: данные, связи, задания
+node tools/test-engine.js          # движок T-SQL: запросы с известным результатом
 node tools/build-index.js          # пересобрать schemas/index.js после правки баз
 node tools/sql.js sewing "SELECT TOP 5 * FROM Orders"   # запрос к учебной базе из консоли
 python3 -m http.server 8000        # открыть курс на http://localhost:8000

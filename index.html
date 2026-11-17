@@ -47,11 +47,14 @@
       var failed = [];
       function next(i) {
         if (i >= files.length) {
-          if (failed.length) {
-            document.getElementById('view').innerHTML = '<div class="page"><div class="err-box">Не удалось загрузить файлы: ' + failed.join(', ') + '. Проверьте, что архив распакован полностью.</div></div>';
-            if (!window.App) return;
+          var msg = 'Не удалось загрузить файлы: ' + failed.join(', ') + '. Проверьте, что архив распакован полностью, и обновите страницу.';
+          if (failed.length && !(window.App && App.start)) {
+            document.getElementById('view').innerHTML = '<div class="page"><div class="err-box">' + msg + '</div></div>';
+            return;
           }
           App.start();
+          // курс запустился, но без части файлов — предупреждение не должно пропасть при отрисовке страницы
+          if (failed.length && window.U) U.toast(U.esc(msg), 'err', 20000);
           return;
         }
         // «?» в начале — необязательный файл (его может не быть)

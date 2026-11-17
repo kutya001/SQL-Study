@@ -4,7 +4,7 @@
    ============================================================ */
 (function (G) {
   'use strict';
-  var U = G.U, h = U.h, A = G.App, Grid = G.Grid;
+  var U = G.U, h = U.h, A = G.App, Grid = G.Grid, T = G.TSQL;
   var SP = G.SchemaPanel = {};
   var openState = {};   // какие таблицы раскрыты (на время сеанса, по базе)
 
@@ -17,10 +17,14 @@
 
   /* --- Просмотр первых строк таблицы --- */
   A.tablePreview = function (pack, name) {
-    var r = A.runSQL('SELECT TOP (20) * FROM ' + name + ';', { trace: false, pack: pack.id });
-    var cnt = A.runSQL('SELECT COUNT(*) FROM ' + name + ';', { trace: false, pack: pack.id });
+    // имя — в квадратных скобках: таблица может называться зарезервированным словом (Order, User, Group…).
+    // Это служебные запросы, поэтому в статистику запусков ученика они не попадают.
+    var xo = A.execOpts(pack.id), db = A.dbFor(pack.id), q = '[' + String(name).replace(/[\[\]]/g, '') + ']';
+    var r = T.execute('SELECT TOP (20) * FROM ' + q + ';', db, xo);
+    var cnt = T.execute('SELECT COUNT(*) FROM ' + q + ';', db, xo);
     var rs = r.results[0];
     var total = cnt.results[0] ? cnt.results[0].rows[0][0] : '?';
+    if (r.error) return { title: pack.dbName + '.dbo.' + name, table: Grid.errorBox(r.error) };
     return { title: pack.dbName + '.dbo.' + name + ' — первые ' + Math.min(20, rs ? rs.rows.length : 0) + ' из ' + total + ' строк', table: rs ? Grid.table(rs.columns, rs.rows, rs.kinds) : h('p.muted', 'Нет данных') };
   };
 

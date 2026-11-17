@@ -32,7 +32,7 @@
     work.appendChild(main); work.appendChild(side);
     box.appendChild(work);
     var ed = G.Editor.create(main, { value: it.sql || task.starter || '', minLines: o.minLines || 4, schema: pack && pack.tables, onRun: function (s) { run(s.sql); } });
-    var schemaBtn = h('button.btn.ghost.sec.schema-tgl', { title: 'Схема базы: таблицы и столбцы', onclick: function () {
+    var schemaBtn = h('button.btn.ghost.aux.schema-tgl', { title: 'Схема базы: таблицы и столбцы', onclick: function () {
       if (window.innerWidth < 768) { if (pack) A.schemaSheet(pack, function (text) { ed.insert(text); }); return; }
       A.user.settings.schemaPanel = !schemaOn(); A.save(); applySchema();
     } }, I('schema', 18), h('span.bl', 'Схема'));
@@ -51,12 +51,12 @@
       }
     }
     var tries = it.tries || 0;
-    var solBtn = h('button.btn.ghost.sec', { onclick: showSolution, title: 'Решение' }, I('key', 18), h('span.bl', 'Решение'));
+    var solBtn = h('button.btn.ghost.aux', { onclick: showSolution, title: 'Решение' }, I('key', 18), h('span.bl', 'Решение'));
     var btns = h('div.task-btns',
       h('button.btn.run', { onclick: function () { run(ed.getValue()); }, title: 'Выполнить (F5 или Ctrl+Enter)' }, I('play', 16), 'Выполнить'),
       h('button.btn.primary', { onclick: check }, I('check', 18), 'Проверить'),
-      task.hint ? h('button.btn.ghost.sec', { onclick: hint, title: 'Подсказка' }, I('bulb', 18), h('span.bl', 'Подсказка')) : null,
-      h('button.btn.ghost.sec', { onclick: expected, title: 'Ожидаемый результат' }, I('eye', 18), h('span.bl', 'Ожидаемый результат')),
+      task.hint ? h('button.btn.ghost.aux', { onclick: hint, title: 'Подсказка' }, I('bulb', 18), h('span.bl', 'Подсказка')) : null,
+      h('button.btn.ghost.aux', { onclick: expected, title: 'Ожидаемый результат' }, I('eye', 18), h('span.bl', 'Ожидаемый результат')),
       solBtn, schemaBtn);
     main.appendChild(btns);
     main.appendChild(pvArea);
@@ -69,9 +69,14 @@
       Grid.renderRun(resArea, res, { trace: true });
       saveDraft();
     }
-    var saveDraft = U.debounce(function () { var x = A.user.items[task.id] || (A.user.items[task.id] = { ok: false, tries: 0 }); x.sql = ed.getValue(); A.save(); }, 800);
+    var saveDraft = U.debounce(function () {
+      if (!A.user) return;   // успели выйти из учётной записи
+      var x = A.user.items[task.id] || (A.user.items[task.id] = { ok: false, tries: 0 }); x.sql = ed.getValue(); A.save();
+    }, 800);
     function check() {
       var sql = ed.getValue();
+      // пустой редактор (или одни комментарии) — это не попытка: не портим «с первой попытки» и счётчики
+      if (!G.Checker.stripCode(sql).trim()) { U.toast('Сначала напишите запрос', 'warn'); ed.focus(); return; }
       A.user.stats.checks++;
       var r = G.Checker.check(task, sql, db, xo);
       if (r.res) Grid.renderRun(resArea, r.res, { trace: true });
@@ -295,8 +300,12 @@
     var dots = h('div.steps-dots'); page.appendChild(dots);
     var body = h('div.lesson-body'); page.appendChild(body);
     var nav = h('div.lesson-nav'); page.appendChild(nav);
+    var trainRefresh = null;
+    // обновлять статус тренировки после ответов на вопросы (обработчик один на всю страницу)
+    body.addEventListener('click', U.debounce(function () { if (trainRefresh) trainRefresh(); }, 300));
     function draw() {
       rec.step = idx; A.save();
+      trainRefresh = null;
       U.clear(dots); U.clear(body); U.clear(nav);
       for (var i = 0; i < total; i++) {
         (function (i) {
@@ -351,8 +360,7 @@
           if (st.done === st.total) doneBox.appendChild(h('div.lesson-done', h('div.ld-ic', I('award', 26)), h('div', h('b', 'Урок пройден!'), h('div', 'Все задания решены. Двигайтесь дальше.'))));
           else doneBox.appendChild(h('div.muted.center', 'Решено ' + st.done + ' из ' + st.total));
         }
-        // обновлять статус после ответов на вопросы
-        body.addEventListener('click', U.debounce(refresh, 300));
+        trainRefresh = refresh;
       }
     }
     draw();
@@ -490,7 +498,7 @@
     var save = U.debounce(function () { u.sandbox = ed.getValue(); A.save(); }, 800);
     ed = G.Editor.create(main, { value: u.sandbox, minLines: 10, maxLines: 30, schema: cur.tables, onRun: function (s) { run(s.sql); }, onChange: save });
     main.appendChild(h('div.task-btns', h('button.btn.primary', { onclick: function () { ed.run(); }, title: 'Выполнить (F5 или Ctrl+Enter)' }, I('play', 16), 'Выполнить'), h('button.btn', { onclick: function () { run(ed.getValue(), true); }, title: 'Выполнить по шагам: FROM → WHERE → GROUP BY → …' }, I('list', 18), 'Пошагово'),
-      h('button.btn.ghost.sec.m-only', { title: 'Схема базы', onclick: function () { A.schemaSheet(cur, function (text) { ed.insert(text); }); } }, I('schema', 18), h('span.bl', 'Схема')), sel));
+      h('button.btn.ghost.aux.m-only', { title: 'Схема базы', onclick: function () { A.schemaSheet(cur, function (text) { ed.insert(text); }); } }, I('schema', 18), h('span.bl', 'Схема')), sel));
     main.appendChild(pvArea);
     main.appendChild(res);
     drawSide(); drawExamples();
@@ -525,9 +533,9 @@
     var erd = A.erd(pack);
     page.appendChild(erd.el);
     setTimeout(erd.draw, 30);
-    var onR = U.debounce(erd.draw, 100);
+    // перерисовка линий при изменении размера окна; обработчик снимает себя сам, когда страница закрыта
+    var onR = U.debounce(function () { if (!document.body.contains(erd.el)) { window.removeEventListener('resize', onR); return; } erd.draw(); }, 100);
     window.addEventListener('resize', onR);
-    window.addEventListener('hashchange', function off() { window.removeEventListener('resize', onR); window.removeEventListener('hashchange', off); });
     if (pack.relations.length) {
       var rel = h('div.card.pad', h('h3', 'Связи между таблицами'));
       pack.relations.forEach(function (r) { rel.appendChild(h('div', h('code', r[0]), ' → ', h('code', r[1]))); });
@@ -547,7 +555,7 @@
       var card = h('div.card.pad.cheat#' + id, h('h2', sec.title));
       sec.items.forEach(function (it) {
         var p = h('pre.code'); p.innerHTML = G.highlightSQL(it.sql);
-        card.appendChild(h('div.cheat-item', h('div.ci-h', h('b', it.h), h('button.btn.small.ghost', { onclick: function () { navigator.clipboard && navigator.clipboard.writeText(it.sql).then(function () { U.toast('Скопировано', 'ok', 1200); }); } }, 'Копировать')), p, it.note ? richHtml(it.note) : null));
+        card.appendChild(h('div.cheat-item', h('div.ci-h', h('b', it.h), h('button.btn.small.ghost', { onclick: function () { U.copy(it.sql).then(function (ok) { if (ok) U.toast('Скопировано', 'ok', 1200); else U.toast('Не удалось скопировать — выделите текст примера и нажмите Ctrl+C', 'warn', 4500); }); } }, 'Копировать')), p, it.note ? richHtml(it.note) : null));
       });
       page.appendChild(card);
     });

@@ -394,6 +394,13 @@
     throw err(137, 'Необходимо объявить скалярную переменную "' + n.name + '".', n.line);
   }
 
+  // Целая константа рядом с decimal: SQL Server берёт её с минимальной точностью (3 → numeric(1,0)),
+  // а столбцы и переменные int — как numeric(10,0). Поэтому 7.0 / 2 = 3.500000, а Amount / 3 даёт 6 знаков.
+  function litDec(node, t) {
+    while (node && node.type === 'paren') node = node.expr;
+    if (t.kind === 'int' && node && node.type === 'lit' && typeof node.value === 'number') return TY.dec(Math.max(1, String(Math.abs(node.value)).length), 0);
+    return T.asDec(t);
+  }
   function arith(n, C) {
     var L = val(n.left, C), R = val(n.right, C), op = n.op;
     var lt = L.type, rt = R.type;
@@ -437,7 +444,7 @@
     var type;
     if (lk === 'float' || rk === 'float') type = TY.float();
     else if (lk === 'decimal' || rk === 'decimal') {
-      var d1 = T.asDec(lt), d2 = T.asDec(rt), p, s;
+      var d1 = litDec(n.left, lt), d2 = litDec(n.right, rt), p, s;
       switch (op) {
         case '+': case '-': s = Math.max(d1.s, d2.s); p = s + Math.max(d1.p - d1.s, d2.p - d2.s) + 1; break;
         case '*': p = d1.p + d2.p + 1; s = d1.s + d2.s; break;
@@ -1319,7 +1326,7 @@
         return;
       }
       var cc = val(it.expr, M);
-      items.push({ name: it.alias || defaultName(it.expr), type: cc.type.kind === 'null' ? TY.int() : cc.type, fn: cc.fn, rk: rkey(it.expr, scope), alias: it.alias });
+      items.push({ name: it.alias || defaultName(it.expr), type: cc.type.kind === 'null' ? TY.int() : cc.type, nul: cc.type.kind === 'null', fn: cc.fn, rk: rkey(it.expr, scope), alias: it.alias });
     });
     if (assigns.length && items.length) throw err(141, 'Инструкция SELECT, присваивающая значение переменной, не должна объединяться с операциями извлечения данных.', core.line);
 
@@ -1370,7 +1377,7 @@
       offFn = val(qo.offset, oc2).fn;
       fetchFn = qo.fetch ? val(qo.fetch, oc2).fn : null;
     }
-    var outCols = items.map(function (it) { return { name: it.name, type: it.type }; });
+    var outCols = items.map(function (it) { return it.nul ? { name: it.name, type: it.type, nul: true } : { name: it.name, type: it.type }; });
     var traceable = !!opts.traceTop;
 
     function colTitles() { return src.cols.map(function (c) { return (c.adisp ? c.adisp + '.' : '') + c.name; }); }
@@ -1619,14 +1626,18 @@
       throw e;
     }
     var session = env.session;
+    // Константа NULL в списке выбора типа не имеет: SELECT 'a' UNION ALL SELECT NULL — допустимо (тип берётся у второй части)
+    var bothNull = [];
     var types = L.cols.map(function (c, i) {
-      var t = T.strongerType(c.type, R.cols[i].type);
-      if (!T.implicitOk(c.type, t) || !T.implicitOk(R.cols[i].type, t)) throw err(206, 'Конфликт типов операндов: ' + T.typeName(c.type) + ' несовместим с ' + T.typeName(R.cols[i].type));
+      var r = R.cols[i], lt = c.nul ? TY.nul() : c.type, rt = r.nul ? TY.nul() : r.type;
+      var t = T.strongerType(lt, rt);
+      if (!T.implicitOk(lt, t) || !T.implicitOk(rt, t)) throw err(206, 'Конфликт типов операндов: ' + T.typeName(c.type) + ' несовместим с ' + T.typeName(r.type));
+      bothNull[i] = t.kind === 'null';
       return t.kind === 'null' ? TY.int() : t;
     });
-    var cols = L.cols.map(function (c, i) { return { name: c.name, type: types[i] }; });
+    var cols = L.cols.map(function (c, i) { return bothNull[i] ? { name: c.name, type: types[i], nul: true } : { name: c.name, type: types[i] }; });
     function convRows(rows, srcCols) {
-      var need = srcCols.some(function (c, i) { return c.type.kind !== types[i].kind && !(T.isNum(c.type) && T.isNum(types[i])) && c.type.kind !== 'null'; });
+      var need = srcCols.some(function (c, i) { return !c.nul && c.type.kind !== types[i].kind && !(T.isNum(c.type) && T.isNum(types[i])) && c.type.kind !== 'null'; });
       if (!need) return rows;
       return rows.map(function (r) { return r.map(function (v, i) { if (v === null) return null; var from = srcCols[i].type; if (from.kind === types[i].kind || (T.isNum(from) && T.isNum(types[i]))) return v; return convert(v, from, types[i], { settings: session.settings }); }); });
     }
@@ -1695,6 +1706,7 @@
     var d = new Date();
     return T.mkDate(d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds());
   }
+  T.localNow = localNow;
   function dbNames(session) { return Object.keys(session.dbs).map(function (k) { return session.dbs[k].name; }); }
   T.newSession = function (db, opts) {
     opts = opts || {};

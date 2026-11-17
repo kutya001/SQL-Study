@@ -11,4 +11,4 @@
 - Интерфейс и тексты — на русском.
 - id модулей, уроков, задач и баз не меняются — это ключи прогресса учеников.
 - После правки `schemas/` — `node tools/build-index.js`.
-- Перед коммитом: `node tools/validate-course.js && node tools/validate-packs.js` — 0 ошибок.
+- Перед коммитом: `npm run check` (курс, базы, движок, `index.js`) — 0 ошибок. Правишь движок — добавь случай в `tools/test-engine.js`.

@@ -95,6 +95,8 @@
     var spec = task.check || {};
     var code = C.stripCode(sql);
     if (!code.trim()) return { ok: false, msg: 'Сначала напишите запрос.' };
+    // одно и то же «сейчас» для запроса ученика и эталона: иначе GETDATE() в двух запусках различается
+    if (opts.now == null && T.localNow) { var o2 = {}; for (var k in opts) o2[k] = opts[k]; o2.now = T.localNow(); opts = o2; }
     var ures = T.execute(sql, db, opts);
     if (ures.error) return { ok: false, msg: 'Запрос завершился ошибкой — исправьте её и проверьте снова.', res: ures };
     var i;

@@ -45,13 +45,17 @@
   };
 
   /* --- IndexedDB для запоминания выбранной папки --- */
+  var KV = null;
   function idb() {
-    return new Promise(function (res, rej) {
+    if (KV) return KV;
+    KV = new Promise(function (res, rej) {
       var r = indexedDB.open('sqlkurs-store', 1);
       r.onupgradeneeded = function () { r.result.createObjectStore('kv'); };
-      r.onsuccess = function () { res(r.result); };
-      r.onerror = function () { rej(r.error); };
+      r.onsuccess = function () { var d = r.result; d.onversionchange = function () { d.close(); KV = null; }; d.onclose = function () { KV = null; }; res(d); };
+      r.onerror = function () { KV = null; rej(r.error); };
+      r.onblocked = function () { KV = null; rej(new Error('база IndexedDB занята другой вкладкой')); };
     });
+    return KV;
   }
   function idbGet(k) { return idb().then(function (db) { return new Promise(function (res, rej) { var t = db.transaction('kv').objectStore('kv').get(k); t.onsuccess = function () { res(t.result); }; t.onerror = function () { rej(t.error); }; }); }); }
   function idbSet(k, v) { return idb().then(function (db) { return new Promise(function (res, rej) { var t = db.transaction('kv', 'readwrite').objectStore('kv').put(v, k); t.onsuccess = function () { res(); }; t.onerror = function () { rej(t.error); }; }); }); }
@@ -271,7 +275,7 @@
         lastSnap[rec.id] = now;
         var at = new Date(now).toISOString();
         await vtx('snaps', 'readwrite', function (st) { return st.put({ key: rec.id + '|' + at, id: rec.id, at: at, xp: rec.xp || 0, solved: (rec.stats && rec.stats.solved) || 0, data: rec }); });
-        var keys = await vtx('snaps', 'readonly', function (st) { return st.getAllKeys(IDBKeyRange.bound(rec.id + '|', rec.id + '|￿')); }) || [];
+        var keys = await vtx('snaps', 'readonly', function (st) { return st.getAllKeys(IDBKeyRange.bound(rec.id + '|', rec.id + '|\uffff')); }) || [];
         if (keys.length > SNAP_KEEP) {
           var old = keys.slice(0, keys.length - SNAP_KEEP);
           await vtx('snaps', 'readwrite', function (st) { old.forEach(function (k) { st.delete(k); }); });
@@ -285,7 +289,7 @@
   // Снимки прогресса пользователя (новые сверху)
   S.snapshots = async function (id) {
     try {
-      var all = await vtx('snaps', 'readonly', function (st) { return st.getAll(IDBKeyRange.bound(id + '|', id + '|￿')); }) || [];
+      var all = await vtx('snaps', 'readonly', function (st) { return st.getAll(IDBKeyRange.bound(id + '|', id + '|\uffff')); }) || [];
       return all.reverse();
     } catch (e) { return []; }
   };
@@ -371,14 +375,25 @@
   };
   S.exists = async function (id) { return !!(await S.load(id)); };
 
-  var pending = null, timer = null, saving = false;
+  var pending = null, timer = null, writes = 0, chain = Promise.resolve();
   function stamp(user) { user.updated = new Date().toISOString(); user.rev = (user.rev || 0) + 1; }
   function done() { S.lastSaved = new Date(); S.lastError = null; if (S.onSaved) S.onSaved(); }
-  S.saveNow = async function (user) {
+  // Записи идут строго по очереди: иначе две одновременные записи одного файла могут завершиться
+  // в обратном порядке, и на диске останется более старая копия.
+  S.saveNow = function (user) {
+    writes++;
+    // куда писать, запоминаем сразу: пока запись ждёт очереди, страница входа может переподключать хранилище
+    var to = { mode: S.mode, dir: S.progDir };
+    var p = chain.then(function () { return writeUser(user, to); });
+    chain = p.catch(function () { });
+    return p.then(function (v) { writes--; return v; }, function (e) { writes--; throw e; });
+  };
+  async function writeUser(user, to) {
     if (S.paused && user.id === S.current) return;
     stamp(user);
-    if (S.mode === 'fs') {
-      var fh = await S.progDir.getFileHandle(user.id + '.json', { create: true });
+    if (to.mode === 'fs') {
+      if (!to.dir) throw new Error('папка курса не подключена');
+      var fh = await to.dir.getFileHandle(user.id + '.json', { create: true });
       var w = await fh.createWritable();
       await w.write(JSON.stringify(user, null, 1));
       await w.close();
@@ -404,32 +419,32 @@
     if (S.paused && user.id === S.current) return;
     pending = user;
     clearTimeout(timer);
-    timer = setTimeout(async function () {
-      if (saving) { if (pending) S.save(pending); return; }
+    timer = setTimeout(function () {
       if (!pending) return;
-      saving = true;
       var u = pending; pending = null;
-      try { await S.saveNow(u); }
-      catch (e) { S.lastError = e; if (S.onError) S.onError(e); }
-      saving = false;
+      S.saveNow(u).catch(function (e) { S.lastError = e; if (S.onError) S.onError(e); });
     }, S.mode === 'fs' ? 600 : 200);
   };
   // Есть ли несохранённые изменения (запись ещё не завершилась)
-  S.hasPending = function () { return !!pending || saving; };
+  S.hasPending = function () { return !!pending || writes > 0; };
   S.flush = function () {
     if (!pending) return;
     clearTimeout(timer);
     var u = pending; pending = null;
     if (S.mode !== 'fs') { S.saveSync(u); return; }
-    saving = true;
-    S.saveNow(u).catch(function (e) { S.lastError = e; }).then(function () { saving = false; });
+    S.saveNow(u).catch(function (e) { S.lastError = e; if (S.onError) S.onError(e); });
   };
+  // Удалить ученика: файл в папке и все его копии в этом браузере (иначе он «восстановится» из запасной копии)
   S.remove = async function (id) {
-    if (S.mode === 'fs') { await S.progDir.removeEntry(id + '.json'); }
-    else {
-      localStorage.removeItem(LS_PREFIX + id);
-      try { await vtx('users', 'readwrite', function (st) { return st.delete(id); }); } catch (e) { }
-    }
+    if (pending && pending.id === id) { pending = null; clearTimeout(timer); }
+    await chain;
+    if (S.mode === 'fs') { try { await S.progDir.removeEntry(id + '.json'); } catch (e) { if (e && e.name !== 'NotFoundError') throw e; } }
+    try { localStorage.removeItem(LS_PREFIX + id); } catch (e) { }
+    try {
+      await vtx('users', 'readwrite', function (st) { return st.delete(id); });
+      await vtx('snaps', 'readwrite', function (st) { return st.delete(IDBKeyRange.bound(id + '|', id + '|\uffff')); });
+    } catch (e) { }
+    delete lastSnap[id];
   };
   S.where = function (user) {
     if (S.mode === 'fs') return (S.folderName() || 'папка курса') + '/progress/' + (user ? user.id : '<логин>') + '.json';

@@ -70,15 +70,15 @@
     if (b.xp === u.xp) return false;
     return Date.now() - new Date(b.at).getTime() > 2 * 86400000;
   };
-  var autoDone = false;
+  var autoDone = {};
   function autoBackup() {
     var u = A.user;
-    if (autoDone || !u || S.mode === 'fs' || S.paused || !u.settings || !u.settings.autoBackup) return;
+    if (!u || autoDone[u.id] || S.mode === 'fs' || S.paused || !u.settings || !u.settings.autoBackup) return;
     var b = u.backup;
     if (b && (b.xp === u.xp || Date.now() - new Date(b.at).getTime() < 20 * 3600000)) return;
     if (!b && !(u.xp > 0)) return;
-    autoDone = true;   // не чаще одного раза за запуск
-    setTimeout(function () { A.backupFile(u, true); }, 300);
+    autoDone[u.id] = true;   // не чаще одного раза за запуск (для каждого ученика)
+    setTimeout(function () { if (A.user === u && !S.paused) A.backupFile(u, true); }, 300);
   }
   A.touchStreak = function () {
     var u = A.user, t = U.today();
@@ -101,9 +101,9 @@
     var before = A.rank(A.user.xp);
     A.user.xp += n;
     var after = A.rank(A.user.xp);
-    U.toast('<b>+' + n + ' XP</b> ' + (why || ''), 'xp');
+    U.toast('<b>+' + n + ' XP</b> ' + U.esc(why || ''), 'xp');
     if (after.level > before.level) {
-      setTimeout(function () { U.toast('Новый ранг: <b>' + after.name + '</b>!', 'rank', 5000); }, 600);
+      setTimeout(function () { U.toast('Новый ранг: <b>' + U.esc(after.name) + '</b>!', 'rank', 5000); }, 600);
       A.log('Новый ранг: ' + after.name);
     }
     A.renderTop();
@@ -384,7 +384,10 @@
 
   /* ---------------- Тема ---------------- */
   A.applyTheme = function () {
-    var t = (A.user && A.user.settings && A.user.settings.theme) || localStorage.getItem('sqlkurs.theme') || 'light';
+    var saved = null;
+    try { saved = localStorage.getItem('sqlkurs.theme'); } catch (e) { }
+    var t = (A.user && A.user.settings && A.user.settings.theme) || saved || 'light';
+    if (t !== 'dark') t = 'light';
     document.documentElement.setAttribute('data-theme', t);
     var mc = document.querySelector('meta[name="theme-color"]'); if (mc) mc.setAttribute('content', t === 'dark' ? '#0b1020' : '#eef1f8');
   };
@@ -393,6 +396,7 @@
   var routes = [];
   A.route = function (re, fn) { routes.push([re, fn]); };
   A.go = function (hash) { if (location.hash === hash) A.dispatch(); else location.hash = hash; };
+  var shownHash = null;
   A.dispatch = function () {
     var hash = location.hash || '#/home';
     var view = U.qs('#view');
@@ -400,12 +404,15 @@
     for (var i = 0; i < routes.length; i++) {
       var m = routes[i][0].exec(hash);
       if (m) {
+        // та же страница перерисовывается (например, после действия на ней) — остаёмся на том же месте
+        var same = hash === shownHash, y = same ? (window.pageYOffset || 0) : 0;
+        shownHash = hash;
         U.clear(view);
         view.className = '';
-        window.scrollTo(0, 0);
         A.closeDrawer(); document.body.classList.remove('bars-hidden');
         try { routes[i][1].apply(null, [view].concat(m.slice(1))); }
         catch (e) { console.error(e); view.appendChild(h('div.page', h('div.err-box', 'Ошибка страницы: ' + e.message))); }
+        window.scrollTo(0, y);
         if (A.user && hash !== '#/start') { A.user.last = hash; }
         A.renderTop();
         return;
@@ -413,10 +420,17 @@
     }
     location.hash = '#/home';
   };
-  window.addEventListener('hashchange', A.dispatch);
+  window.addEventListener('hashchange', function () {
+    U.closeModals(400);   // ушли на другую страницу (например, кнопкой «Назад») — открытые окна и шторки закрываем
+    A.dispatch();
+  });
 
   /* ================= Страница входа ================= */
   A.route(/^#\/start$/, function (view) {
+    if (A.user) {
+      if (!S.paused) { S.save(A.user); S.flush(); }
+      S.release(); A.user = null;
+    }
     view.className = 'start';
     var box = h('div.start-box');
     view.appendChild(box);
@@ -616,10 +630,13 @@
       users.forEach(function (u) {
         var r = A.rank(u.xp || 0);
         list.appendChild(h('button.user-card', { onclick: function () { login(u); } },
-          h('div.avatar', (u.name || '?').trim().charAt(0).toUpperCase()),
+          h('div.avatar', initials(u.name)),
           h('div.uc-info', h('div.uc-n', u.name), h('div.muted', r.name + ' · ' + (u.xp || 0) + ' XP' + (u.dept ? ' · ' + u.dept : ''))),
           u.pinHash ? h('span.lock', { title: 'Защищено PIN-кодом' }, I('lock', 16)) : null));
       });
+    }).catch(function (e) {
+      console.error(e);
+      list.appendChild(h('div.err-box', 'Не удалось прочитать список учеников: ' + (e && e.message || e) + '. Обновите страницу; если папка курса недоступна — подключите её заново.'));
     });
     var name = h('input.inp', { placeholder: 'Фамилия и имя, например: Асанова Айгуль', maxlength: 60 });
     var login1 = h('input.inp', { placeholder: 'логин (латиница) — имя файла прогресса', maxlength: 40 });
@@ -675,7 +692,11 @@
       var inp = h('input.inp', { type: 'password', inputmode: 'numeric', maxlength: 6, placeholder: 'PIN' });
       var md = U.modal('Вход: ' + fresh.name, h('div', h('p', 'Введите PIN-код'), inp), [{ text: 'Отмена' }, {
         text: 'Войти', primary: true, onclick: async function (close) {
-          if (await U.hash(inp.value) === fresh.pinHash) { close(); enter(fresh); }
+          if (await U.checkPin(inp.value, fresh.pinHash)) {
+            // хеш старого образца (без crypto.subtle) заменяем на обычный — он одинаков в любом окружении
+            if (String(fresh.pinHash).length < 20) fresh.pinHash = await U.hash(inp.value);
+            close(); enter(fresh);
+          }
           else { U.toast('Неверный PIN', 'err'); inp.value = ''; inp.focus(); }
           return false;
         }
@@ -686,10 +707,17 @@
     }
     enter(fresh);
   }
+  // Привести данные ученика к текущему формату; терпимо к неполным и повреждённым файлам
   function migrate(u) {
     var d = newUser(u.name, u.id);
-    for (var k in d) if (u[k] === undefined) u[k] = d[k];
-    for (var s in d.stats) if (u.stats[s] === undefined) u.stats[s] = d.stats[s];
+    for (var k in d) {
+      var dv = d[k], uv = u[k];
+      var isObj = dv !== null && typeof dv === 'object';
+      if (uv === undefined || (isObj && (uv === null || typeof uv !== 'object' || Array.isArray(uv) !== Array.isArray(dv)))) { u[k] = dv; continue; }
+      if (isObj && !Array.isArray(dv)) for (var s in dv) if (uv[s] === undefined || (typeof dv[s] === 'number' && typeof uv[s] !== 'number')) uv[s] = dv[s];
+    }
+    if (typeof u.xp !== 'number' || !isFinite(u.xp)) u.xp = 0;
+    if (typeof u.name !== 'string' || !u.name) u.name = String(u.name || u.id || 'Ученик');
     return u;
   }
   async function enter(u, isNew) {
@@ -716,8 +744,11 @@
       h('div.modal-body', h('p', 'Вы продолжили заниматься под именем «' + (A.user ? A.user.name : '') + '» в другой вкладке или окне. Чтобы два окна не затёрли прогресс друг друга, эта вкладка остановлена и ничего не сохраняет.'), h('p.muted', 'Закройте её или нажмите «Продолжить здесь» — тогда остановится другая.')),
       h('div.modal-foot', h('button.btn.primary', {
         onclick: async function () {
-          var u = await S.load(A.user.id); ov.remove();
-          if (u) { S.claim(u.id); A.user = migrate(u); A.renderTop(); A.dispatch(); U.toast('Продолжаем здесь. Прогресс из другой вкладки загружен.', 'ok'); }
+          var u = null;
+          try { u = A.user ? await S.load(A.user.id) : null; } catch (e) { console.error(e); }
+          ov.remove();
+          if (u) { S.claim(u.id); A.user = migrate(u); A.applyTheme(); A.renderTop(); A.dispatch(); U.toast('Продолжаем здесь. Прогресс из другой вкладки загружен.', 'ok'); }
+          else { U.toast('Не удалось загрузить прогресс — войдите заново', 'warn', 5000); A.logout(); }
         }
       }, 'Продолжить здесь'))));
     document.body.appendChild(ov);
@@ -826,7 +857,7 @@
     var r = A.rank(u.xp);
     page.appendChild(h('h1', 'Профиль'));
     page.appendChild(h('div.card.pad',
-      h('div.prof-head', h('div.avatar.big', u.name.charAt(0).toUpperCase()), h('div', h('h2', u.name), h('div.muted', 'Логин: ' + u.id + (u.dept ? ' · ' + u.dept : '')), h('div', r.name + ' · ' + u.xp + ' XP'))),
+      h('div.prof-head', h('div.avatar.big', initials(u.name)), h('div', h('h2', u.name), h('div.muted', 'Логин: ' + u.id + (u.dept ? ' · ' + u.dept : '')), h('div', r.name + ' · ' + u.xp + ' XP'))),
       h('table.kv',
         h('tr', h('td', 'Где хранится прогресс'), h('td', h('code', S.where(u)))),
         h('tr', h('td', 'Последнее сохранение'), h('td', S.lastSaved ? U.fmtDate(S.lastSaved) : '—')),
@@ -836,17 +867,24 @@
         h('tr', h('td', 'Лучшая серия дней'), h('td', String(u.streak.best || 0))))));
     var theme = h('select.inp', h('option', { value: 'light' }, 'Светлая'), h('option', { value: 'dark' }, 'Тёмная'));
     theme.value = u.settings.theme || 'light';
-    theme.addEventListener('change', function () { u.settings.theme = theme.value; localStorage.setItem('sqlkurs.theme', theme.value); A.applyTheme(); A.save(); });
+    theme.addEventListener('change', function () {
+      u.settings.theme = theme.value;
+      try { localStorage.setItem('sqlkurs.theme', theme.value); } catch (e) { }
+      A.applyTheme(); A.save(); A.renderTop();
+    });
     page.appendChild(h('div.card.pad', h('h3', 'Настройки'), h('label.inline', 'Тема оформления ', theme)));
     var fileInp = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' } });
     fileInp.addEventListener('change', async function () {
-      var f = fileInp.files[0]; if (!f) return;
+      var f = fileInp.files[0]; fileInp.value = ''; if (!f) return;
       try {
         var data = JSON.parse(await f.text());
-        if (!data.id || !data.items) throw new Error('это не файл прогресса курса');
+        if (!data || typeof data !== 'object' || !data.id || !data.items || typeof data.items !== 'object') throw new Error('это не файл прогресса курса');
         if (data.id !== u.id && !(await U.confirm('Импорт', 'Файл принадлежит пользователю «' + U.esc(data.name) + '». Заменить ваш прогресс его данными?', 'Заменить'))) return;
+        if (A.user !== u) return;   // пока выбирали файл, вышли из учётной записи
+        await S.snapshotNow(u);     // текущее состояние остаётся в «Копиях в браузере»
         data.id = u.id; data.name = u.name; data.pinHash = u.pinHash;
-        A.user = migrate(data); A.save(); U.toast('Прогресс загружен', 'ok'); A.dispatch();
+        data.rev = Math.max(u.rev || 0, data.rev || 0);
+        A.user = migrate(data); A.applyTheme(); A.save(); U.toast('Прогресс загружен. Прежнее состояние — в «Копиях в браузере»', 'ok', 5000); A.dispatch();
       } catch (e) { U.toast('Не удалось загрузить: ' + U.esc(e.message), 'err'); }
     });
     var autoCb = h('input', { type: 'checkbox' }); autoCb.checked = !!u.settings.autoBackup;
@@ -949,8 +987,8 @@
       holder.appendChild(G.Grid.table(cols, rows, null, { max: 1000 }));
       holder.appendChild(h('div.row-btns', h('button.btn', {
         onclick: function () {
-          var csv = '﻿' + [cols].concat(rows).map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';'); }).join('\r\n');
-          var a = h('a', { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: 'svodka_po_gruppe.csv' }); document.body.appendChild(a); a.click(); a.remove();
+          var csv = '\uFEFF' + [cols].concat(rows).map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';'); }).join('\r\n');
+          U.download('svodka_po_gruppe.csv', csv, 'text/csv;charset=utf-8');
         }
       }, 'Скачать CSV для Excel')));
     }
@@ -961,8 +999,8 @@
   A.start = function () {
     A.applyTheme();
     if (!C.modules.length) { U.qs('#view').appendChild(h('div.page', h('div.err-box', 'Не найдены файлы модулей курса (папка content/modules).'))); return; }
-    location.hash = '#/start';
-    A.dispatch();
+    // если адрес уже #/start, событие hashchange не придёт — рисуем сами; иначе страницу нарисует оно
+    if (location.hash === '#/start') A.dispatch(); else location.hash = '#/start';
   };
   window.addEventListener('beforeunload', function (e) {
     if (!A.user) return;
