@@ -305,6 +305,7 @@
     var route = location.hash || '#/home';
     var sec = A.section(route);
     var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var wide = document.body.classList.contains('wide-ui');
 
     // --- левая панель (на телефоне — выдвижное меню)
     if (side) {
@@ -334,6 +335,7 @@
     top.appendChild(h('div.tb-right',
       h('span.pill.streak', { title: 'Дней подряд с занятиями' }, I('flame', 16), String(u.streak.days)),
       h('span.pill.xp', { title: r.name + ': ' + u.xp + ' XP' + (r.next ? ' (до следующего ранга — ' + (r.next - u.xp) + ')' : '') }, I('star', 16), String(u.xp)),
+      h('button.icon-btn.tb-wide', { title: wide ? 'Вернуть обычную ширину (по центру)' : 'Растянуть на всю ширину экрана', 'aria-label': 'Ширина интерфейса', 'aria-pressed': wide ? 'true' : 'false', onclick: A.toggleWide }, I(wide ? 'narrow' : 'widen')),
       h('button.icon-btn.tb-theme', { title: dark ? 'Светлая тема' : 'Тёмная тема', 'aria-label': 'Сменить тему', onclick: A.toggleTheme }, I(dark ? 'sun' : 'moon')),
       h('a.tb-avatar', { href: '#/profile', title: u.name }, h('span.avatar.sm', initials(u.name)))));
 
@@ -390,7 +392,24 @@
     if (t !== 'dark') t = 'light';
     document.documentElement.setAttribute('data-theme', t);
     var mc = document.querySelector('meta[name="theme-color"]'); if (mc) mc.setAttribute('content', t === 'dark' ? '#0b1020' : '#eef1f8');
+    // вместе с темой — остальной вид: ширина интерфейса и анимация фона
+    document.body.classList.toggle('wide-ui', A.pref('wide') === '1');
+    var bp = A.pref('bg');   // 'on' / 'off'; не задано — как решит сам фон (выключен, если система просит «меньше движения»)
+    if (G.Backdrop) G.Backdrop.set(bp === 'on' ? true : bp === 'off' ? false : null);
   };
+  // Настройки вида: у вошедшего ученика — из его файла, до входа — из памяти браузера
+  A.pref = function (key) {
+    var s = A.user && A.user.settings, v = s ? s[key === 'bg' ? 'bgAnim' : key] : undefined;
+    if (v === undefined || v === null) { try { v = localStorage.getItem('sqlkurs.' + key); } catch (e) { v = null; } }
+    return v;
+  };
+  A.setPref = function (key, value) {
+    if (A.user) { A.user.settings[key === 'bg' ? 'bgAnim' : key] = value; A.save(); }
+    try { localStorage.setItem('sqlkurs.' + key, value); } catch (e) { }
+    A.applyTheme(); A.renderTop();
+  };
+  // Во всю ширину экрана / по центру
+  A.toggleWide = function () { A.setPref('wide', A.pref('wide') === '1' ? '0' : '1'); window.dispatchEvent(new Event('resize')); };
 
   /* ---------------- Маршрутизация ---------------- */
   var routes = [];
@@ -872,7 +891,14 @@
       try { localStorage.setItem('sqlkurs.theme', theme.value); } catch (e) { }
       A.applyTheme(); A.save(); A.renderTop();
     });
-    page.appendChild(h('div.card.pad', h('h3', 'Настройки'), h('label.inline', 'Тема оформления ', theme)));
+    var wideCb = h('input', { type: 'checkbox' }); wideCb.checked = A.pref('wide') === '1';
+    wideCb.addEventListener('change', function () { A.setPref('wide', wideCb.checked ? '1' : '0'); window.dispatchEvent(new Event('resize')); });
+    var bgCb = h('input', { type: 'checkbox' }); bgCb.checked = !!(G.Backdrop && G.Backdrop.active);
+    bgCb.addEventListener('change', function () { A.setPref('bg', bgCb.checked ? 'on' : 'off'); });
+    page.appendChild(h('div.card.pad', h('h3', 'Настройки'),
+      h('label.inline', 'Тема оформления ', theme),
+      h('label.check', wideCb, h('span', 'Интерфейс во всю ширину экрана', h('small', 'иначе содержимое стоит по центру; на компьютере переключается и кнопкой ↔ вверху'))),
+      h('label.check', bgCb, h('span', 'Анимация фона', h('small', 'фон за карточками плавно движется и отзывается на прокрутку и курсор; на слабом компьютере можно выключить')))));
     var fileInp = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' } });
     fileInp.addEventListener('change', async function () {
       var f = fileInp.files[0]; fileInp.value = ''; if (!f) return;

@@ -28,50 +28,6 @@
     return { title: pack.dbName + '.dbo.' + name + ' — первые ' + Math.min(20, rs ? rs.rows.length : 0) + ' из ' + total + ' строк', table: rs ? Grid.table(rs.columns, rs.rows, rs.kinds) : h('p.muted', 'Нет данных') };
   };
 
-  /* --- Схема связей (ERD): общая для страницы «Схема» и окна из задания --- */
-  A.erd = function (pack) {
-    var tables = pack.tables;
-    var ncol = tables.length > 9 ? 4 : (tables.length <= 4 ? Math.max(2, Math.min(3, tables.length)) : 3);
-    var wrap = h('div.erd', { style: { gridTemplateColumns: 'repeat(' + ncol + ', minmax(230px, 1fr))' } });
-    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'erd-lines');
-    wrap.appendChild(svg);
-    var fks = fkMap(pack), lay = pack.layout || {};
-    tables.forEach(function (t, i) {
-      var p = lay[t.name] || [i % ncol, Math.floor(i / ncol)];
-      var b = h('div.erd-t', { style: { gridColumn: (p[0] + 1), gridRow: (p[1] + 1) } },
-        h('div.erd-h', h('b', t.name), h('button.icon-btn.small', { title: 'Показать данные', onclick: function () { var pv = A.tablePreview(pack, t.name); U.modal(pv.title, pv.table); } }, G.Icon('table', 16))),
-        h('div.erd-sub', (t.title || '') + (t.rowCount !== undefined ? ' · ' + t.rowCount + ' стр.' : '')));
-      t.cols.forEach(function (c) {
-        var key = (t.name + '.' + c[0]).toLowerCase();
-        var pk = isPk(pack, t, c[0]), fk = !!fks[key];
-        b.appendChild(h('div.erd-c' + (pk ? '.pk' : '') + (fk ? '.fk' : ''), { 'data-k': key, title: c[2] + (fk ? ' → ' + fks[key] : '') }, h('span.erd-cn', pk ? G.Icon('key', 13) : fk ? G.Icon('link', 13) : null, c[0]), h('span.muted', c[1])));
-      });
-      wrap.appendChild(b);
-    });
-    function draw() {
-      while (svg.firstChild) svg.removeChild(svg.firstChild);
-      var wr = wrap.getBoundingClientRect();
-      if (!wr.width) return;
-      svg.setAttribute('width', wr.width); svg.setAttribute('height', wr.height);
-      (pack.relations || []).forEach(function (r, i) {
-        var a = U.qs('[data-k="' + r[0].toLowerCase() + '"]', wrap), b = U.qs('[data-k="' + r[1].toLowerCase() + '"]', wrap);
-        if (!a || !b) return;
-        var ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
-        var sameCol = ra.left < rb.right && rb.left < ra.right;
-        var ax, bx, c1, c2;
-        if (sameCol) { ax = ra.right - wr.left; bx = rb.right - wr.left; c1 = Math.max(ax, bx) + 34 + (i % 3) * 10; c2 = c1; }
-        else if (ra.left < rb.left) { ax = ra.right - wr.left; bx = rb.left - wr.left; var d1 = Math.max(30, (bx - ax) / 2); c1 = ax + d1; c2 = bx - d1; }
-        else { ax = ra.left - wr.left; bx = rb.right - wr.left; var d2 = Math.max(30, (ax - bx) / 2); c1 = ax - d2; c2 = bx + d2; }
-        var ay = ra.top + ra.height / 2 - wr.top, by = rb.top + rb.height / 2 - wr.top;
-        var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        path.setAttribute('d', 'M' + ax + ',' + ay + ' C' + c1 + ',' + ay + ' ' + c2 + ',' + by + ' ' + bx + ',' + by);
-        path.setAttribute('class', 'erd-path');
-        svg.appendChild(path);
-        var dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); dot.setAttribute('cx', bx); dot.setAttribute('cy', by); dot.setAttribute('r', 3.5); dot.setAttribute('class', 'erd-dot'); svg.appendChild(dot);
-      });
-    }
-    return { el: wrap, draw: draw };
-  };
   // Схема связей в большом окне — не уходя со страницы задания
   // Схема базы в шторке снизу (телефон): нажатие на имя вставляет его в запрос
   A.schemaSheet = function (pack, onPick) {
@@ -84,15 +40,12 @@
     m = U.modal('Схема базы ' + pack.dbName, panel.el, [{ text: 'Готово', primary: true }]);
     return m;
   };
+  // Схема связей в большом окне (сама схема — js/app/erd.js, на canvas)
   A.showErd = function (pack) {
     var e = A.erd(pack);
     var md = U.modal('Схема базы ' + pack.dbName + ': ' + pack.title, h('div.erd-modal', e.el));
     md.el.classList.add('wide');
     setTimeout(e.draw, 40);
-    var onR = U.debounce(e.draw, 100);
-    window.addEventListener('resize', onR);
-    var mo = new MutationObserver(function () { if (!document.body.contains(md.el)) { window.removeEventListener('resize', onR); mo.disconnect(); } });
-    mo.observe(document.body, { childList: true });
   };
 
   /* --- Панель схемы ---
@@ -137,7 +90,7 @@
         var row = h('div.sp-c', { title: c[2] + (fk ? '\nСсылается на ' + fk : '') },
           h('div.sp-c1',
             h('span.sp-cn' + (pk ? '.pk' : '') + (fk ? '.fk' : ''), { onclick: function () { pick(c[0]); } }, pk ? G.Icon('key', 12) : null, c[0]),
-            h('span.sp-ct', c[1])),
+            h('span.sp-ct', { 'data-cat': A.typeCat ? A.typeCat(c[1]) : 'other' }, c[1])),
           c[2] || fk ? h('div.sp-cd', fk ? h('a', { href: '#', onclick: function (e) { e.preventDefault(); focusTable(fk.split('.')[0]); } }, '→ ' + fk) : null, fk && c[2] ? ' · ' : null, c[2] || '') : null);
         row.setAttribute('data-s', (c[0] + ' ' + (c[2] || '')).toLowerCase());
         d.appendChild(row);
