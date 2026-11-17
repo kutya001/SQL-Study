@@ -36,6 +36,9 @@ jobs:
       - name: Движок T-SQL — запросы с известным результатом
         run: node tools/test-engine.js
 
+      - name: Подсказки и экскурсии — структура, метки элементов, ссылки
+        run: node tools/validate-guide.js
+
       - name: Пересобрать schemas/index.js
         run: node tools/build-index.js
 

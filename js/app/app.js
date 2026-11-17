@@ -32,6 +32,7 @@
 
   /* ---------------- Ранги ---------------- */
   var RANKS = [[0, 'Новичок'], [200, 'Стажёр'], [600, 'Младший аналитик'], [1200, 'Аналитик'], [2200, 'Старший аналитик'], [3500, 'Эксперт SQL'], [5000, 'Гуру SQL']];
+  A.RANKS = RANKS;
   A.rank = function (xp) {
     var r = RANKS[0], next = null;
     for (var i = 0; i < RANKS.length; i++) { if (xp >= RANKS[i][0]) { r = RANKS[i]; next = RANKS[i + 1] || null; } }
@@ -255,7 +256,8 @@
   var NAV2 = [
     { href: '#/ach', title: 'Достижения', icon: 'trophy', re: /^#\/ach\b/ },
     { href: '#/team', title: 'Сводка по группе', icon: 'users', re: /^#\/team\b/ },
-    { href: '#/profile', title: 'Профиль', icon: 'user', re: /^#\/profile\b/ }
+    { href: '#/profile', title: 'Профиль', icon: 'user', re: /^#\/profile\b/ },
+    { href: '#/help', title: 'Помощь', icon: 'help', re: /^#\/help\b/ }
   ];
   var TABS = [
     { href: '#/home', title: 'Курс', icon: 'course', re: NAV[0].re },
@@ -309,32 +311,34 @@
         h('button.icon-btn.side-close', { title: 'Закрыть меню', 'aria-label': 'Закрыть меню', onclick: A.closeDrawer }, I('x'))));
       side.appendChild(h('div.side-scroll',
         h('div.side-cap', 'Учёба'),
-        h('nav.side-nav', NAV.slice(0, 3).map(function (x) { return navItem(x, route); })),
+        h('nav.side-nav', { 'data-guide': 'nav-study' }, NAV.slice(0, 3).map(function (x) { return navItem(x, route); })),
         h('div.side-cap', 'Данные'),
-        h('nav.side-nav', NAV.slice(3).map(function (x) { return navItem(x, route); })),
+        h('nav.side-nav', { 'data-guide': 'nav-data' }, NAV.slice(3).map(function (x) { return navItem(x, route); })),
         h('div.side-cap', 'Вы'),
-        h('nav.side-nav', NAV2.map(function (x) { return navItem(x, route); }))));
+        h('nav.side-nav', { 'data-guide': 'nav-me' }, NAV2.map(function (x) { return navItem(x, route); }))));
       side.appendChild(h('div.side-foot',
-        h('a.side-user', { href: '#/profile', title: 'Профиль' },
+        h('a.side-user', { href: '#/profile', title: 'Профиль: ранг и XP', 'data-guide': 'side-user' },
           h('span.avatar', initials(u.name)),
           h('span.su-main', h('span.su-name', u.name), h('span.su-rank', r.name + ' · ' + u.xp + ' XP'), h('span.su-bar', h('i', { style: { width: pct + '%' } })))),
-        h('div.side-actions',
+        h('div.side-actions', { 'data-guide': 'side-actions' },
           h('button.icon-btn', { title: dark ? 'Светлая тема' : 'Тёмная тема', 'aria-label': 'Сменить тему', onclick: A.toggleTheme }, I(dark ? 'sun' : 'moon')),
           h('button.icon-btn.side-pal', { title: 'Оформление: тема и палитра', 'aria-label': 'Оформление', onclick: A.showAppearance }, I('palette')),
+          h('button.icon-btn.side-help', { title: 'Помощь: экскурсия и подсказки по этой странице', 'aria-label': 'Помощь', onclick: function () { A.closeDrawer(); if (G.Guide) G.Guide.menu(); } }, I('help')),
           h('button.icon-btn.side-collapse', { title: 'Свернуть панель', 'aria-label': 'Свернуть панель', onclick: A.toggleSide }, I('sidebar')),
           h('button.icon-btn', { title: 'Сменить пользователя', 'aria-label': 'Выйти', onclick: function () { A.closeDrawer(); A.logout(); } }, I('logout')))));
     }
 
     // --- верхняя панель
-    top.appendChild(h('button.icon-btn.tb-menu', { title: 'Меню', 'aria-label': 'Меню', onclick: A.toggleSide }, I('menu', 22)));
+    top.appendChild(h('button.icon-btn.tb-menu', { title: 'Меню', 'aria-label': 'Меню', 'data-guide': 'menu-btn', onclick: A.toggleSide }, I('menu', 22)));
     top.appendChild(h('div.tb-title', sec ? h('span.tb-ic', I(sec.icon, 18)) : null, h('span.tb-sec', sec ? sec.title : 'SELECT с нуля')));
     top.appendChild(h('div.tb-right',
-      h('span.pill.streak', { title: 'Дней подряд с занятиями' }, I('flame', 16), String(u.streak.days)),
-      h('span.pill.xp', { title: r.name + ': ' + u.xp + ' XP' + (r.next ? ' (до следующего ранга — ' + (r.next - u.xp) + ')' : '') }, I('star', 16), String(u.xp)),
-      h('button.icon-btn.tb-wide', { title: wide ? 'Вернуть обычную ширину (по центру)' : 'Растянуть на всю ширину экрана', 'aria-label': 'Ширина интерфейса', 'aria-pressed': wide ? 'true' : 'false', onclick: A.toggleWide }, I(wide ? 'narrow' : 'widen')),
-      h('button.icon-btn.tb-pal', { title: 'Оформление: тема и палитра', 'aria-label': 'Оформление', onclick: A.showAppearance }, I('palette')),
-      h('button.icon-btn.tb-theme', { title: dark ? 'Светлая тема' : 'Тёмная тема', 'aria-label': 'Сменить тему', onclick: A.toggleTheme }, I(dark ? 'sun' : 'moon')),
-      h('a.tb-avatar', { href: '#/profile', title: u.name }, h('span.avatar.sm', initials(u.name)))));
+      h('span.pill.streak', { title: 'Дней подряд с занятиями', 'data-guide': 'streak' }, I('flame', 16), String(u.streak.days)),
+      h('span.pill.xp', { 'data-guide': 'xp', title: r.name + ': ' + u.xp + ' XP' + (r.next ? ' (до следующего ранга — ' + (r.next - u.xp) + ')' : '') }, I('star', 16), String(u.xp)),
+      h('button.icon-btn.tb-wide', { 'data-guide': 'wide', title: wide ? 'Вернуть обычную ширину (по центру)' : 'Растянуть на всю ширину экрана', 'aria-label': 'Ширина интерфейса', 'aria-pressed': wide ? 'true' : 'false', onclick: A.toggleWide }, I(wide ? 'narrow' : 'widen')),
+      h('button.icon-btn.tb-pal', { title: 'Оформление: тема и палитра', 'aria-label': 'Оформление', 'data-guide': 'appearance', onclick: A.showAppearance }, I('palette')),
+      h('button.icon-btn.tb-help' + (G.Guide && G.Guide.isNew() ? '.has-new' : ''), { title: 'Помощь: экскурсия и подсказки по этой странице', 'aria-label': 'Помощь', 'data-guide': 'help', onclick: function () { if (G.Guide) G.Guide.menu(); } }, I('help')),
+      h('button.icon-btn.tb-theme', { 'data-guide': 'theme', title: dark ? 'Светлая тема' : 'Тёмная тема', 'aria-label': 'Сменить тему', onclick: A.toggleTheme }, I(dark ? 'sun' : 'moon')),
+      h('a.tb-avatar', { href: '#/profile', title: u.name + ' — профиль', 'data-guide': 'avatar' }, h('span.avatar.sm', initials(u.name)))));
 
     // --- нижняя панель (телефон)
     if (tabs) TABS.forEach(function (x) { tabs.appendChild(navItem(x, route, 'tab')); });
@@ -536,6 +540,7 @@
     var box = h('div.start-box');
     view.appendChild(box);
     view.appendChild(h('button.icon-btn.start-pal', { title: 'Оформление: тема и палитра', 'aria-label': 'Оформление', onclick: A.showAppearance }, I('palette')));
+    view.appendChild(h('button.icon-btn.start-help', { title: 'О курсе: что это и как устроена учёба', 'aria-label': 'О курсе', onclick: function () { if (G.Guide) G.Guide.about(); } }, I('help')));
     box.appendChild(h('div.start-logo', h('span.logo', I('database', 30)), h('div', h('h1', C.title), h('p', 'Курс T-SQL для аналитиков: только SELECT, от первого запроса до оконных функций'))));
     var area = h('div.start-area'); box.appendChild(area);
     S.init().then(function (state) { drawStart(area, state); }).catch(function (e) { area.appendChild(h('div.err-box', 'Ошибка хранилища: ' + e.message)); });
@@ -877,8 +882,8 @@
       h('div.hero-l',
         h('h1', 'Привет, ' + u.name.split(' ').slice(-1)[0] + '!'),
         h('p', doneL ? 'Продолжайте с того места, где остановились.' : 'Начните с первого урока — это займёт 10–15 минут.'),
-        cont ? h('a.btn.primary.lg', { href: A.lessonHref(cont.m, cont.i) }, (doneL ? 'Продолжить: ' : 'Начать: ') + (active.length > 1 ? A.pack(cont.m.pack).title + ', ' : '') + 'модуль ' + cont.m.num + ', урок ' + (cont.i + 1)) : h('a.btn.primary.lg', { href: '#/trainer' }, lessons.length ? 'Уроки пройдены! Перейти в тренажёр' : 'Перейти в тренажёр')),
-      h('div.hero-stats',
+        cont ? h('a.btn.primary.lg', { href: A.lessonHref(cont.m, cont.i), 'data-guide': 'continue' }, (doneL ? 'Продолжить: ' : 'Начать: ') + (active.length > 1 ? A.pack(cont.m.pack).title + ', ' : '') + 'модуль ' + cont.m.num + ', урок ' + (cont.i + 1)) : h('a.btn.primary.lg', { href: '#/trainer' }, lessons.length ? 'Уроки пройдены! Перейти в тренажёр' : 'Перейти в тренажёр')),
+      h('div.hero-stats', { 'data-guide': 'stats' },
         stat(r.name, 'ранг', r.next ? 'до «' + r.nextName + '»: ' + (r.next - u.xp) + ' XP' : 'максимальный'),
         stat(String(u.xp), 'XP', ''),
         stat(doneL + '/' + lessons.length, 'уроков', ''),
@@ -891,15 +896,16 @@
       page.appendChild(bn);
     }
     page.appendChild(hero);
+    if (G.Guide) G.Guide.offer(page);   // при первом входе — предложение короткой экскурсии
     active.forEach(function (p) {
       var cnt = PF.counts(p);
-      page.appendChild(h('div.pack-h',
+      page.appendChild(h('div.pack-h', { 'data-guide': 'pack-head' },
         I.pack(p, 'lg'),
         h('div.pack-ht', h('h2', p.title), h('div.muted.small', 'база ' + p.dbName + ' · ' + cnt.tables + ' ' + U.plural(cnt.tables, 'таблица', 'таблицы', 'таблиц') + (cnt.trainer ? ' · тренажёр: ' + cnt.trainer : ''))),
         h('div.pack-links', h('a.btn.small', { href: '#/schema/' + p.id, title: 'Схема базы' }, I('schema', 16), 'Схема'), h('a.btn.small', { href: '#/sandbox/' + p.id, title: 'Песочница' }, I('terminal', 16), 'Песочница'), cnt.trainer ? h('a.btn.small', { href: '#/trainer/0/' + p.id, title: 'Тренажёр' }, I('target', 16), 'Тренажёр') : null)));
       var mods = A.packModules(p);
       if (mods.length) {
-        var grid = h('div.mod-grid');
+        var grid = h('div.mod-grid', { 'data-guide': 'modules' });
         mods.forEach(function (m) {
           var ms = A.moduleState(m), unlocked = A.isUnlocked(m);
           grid.appendChild(h(unlocked ? 'a.mod-card' : 'div.mod-card.locked', unlocked ? { href: A.modHref(m) } : { title: 'Откроется после уроков предыдущего модуля' },
@@ -930,7 +936,7 @@
     var others = P.all().filter(function (p) { return active.indexOf(p) < 0; });
     if (others.length) page.appendChild(h('div.card.pad.more-packs', h('b', 'Доступны и другие учебные базы: '), others.map(function (p) { return p.title; }).join(', '), ' ', h('a.btn.small', { href: '#/packs' }, 'Выбрать базы →')));
     // достижения и журнал
-    var achBox = h('div.card.pad', h('div.card-head', h('h3', 'Достижения'), h('a', { href: '#/ach' }, 'все →')));
+    var achBox = h('div.card.pad', { 'data-guide': 'home-ach' }, h('div.card-head', h('h3', 'Достижения'), h('a', { href: '#/ach' }, 'все →')));
     var achRow = h('div.ach-row');
     C.achievements.forEach(function (a) { achRow.appendChild(h('div.ach-mini' + (u.ach[a.id] ? '.got' : ''), { title: a.title + ' — ' + a.desc }, G.Icon.ach(a.id, 20))); });
     achBox.appendChild(achRow);
@@ -960,7 +966,7 @@
     page.appendChild(h('h1', 'Профиль'));
     page.appendChild(h('div.card.pad',
       h('div.prof-head', h('div.avatar.big', initials(u.name)), h('div', h('h2', u.name), h('div.muted', 'Логин: ' + u.id + (u.dept ? ' · ' + u.dept : '')), h('div', r.name + ' · ' + u.xp + ' XP'))),
-      h('table.kv',
+      h('table.kv', { 'data-guide': 'prof-storage' },
         h('tr', h('td', 'Где хранится прогресс'), h('td', h('code', S.where(u)))),
         h('tr', h('td', 'Последнее сохранение'), h('td', S.lastSaved ? U.fmtDate(S.lastSaved) : '—')),
         h('tr', h('td', 'Создан'), h('td', U.fmtDate(u.created))),
@@ -971,13 +977,14 @@
     wideCb.addEventListener('change', function () { A.setPref('wide', wideCb.checked ? '1' : '0'); window.dispatchEvent(new Event('resize')); });
     var bgCb = h('input', { type: 'checkbox' }); bgCb.checked = !!(G.Backdrop && G.Backdrop.active);
     bgCb.addEventListener('change', function () { A.setPref('bg', bgCb.checked ? 'on' : 'off'); });
-    page.appendChild(h('div.card.pad.appearance', h('h3', 'Оформление'),
+    page.appendChild(h('div.card.pad.appearance', { 'data-guide': 'prof-look' }, h('h3', 'Оформление'),
       h('div.ap-row', h('span.ap-cap', 'Тема'), A.themeSwitch()),
       h('div.ap-cap', 'Палитра'),
       A.palettePicker(),
       h('p.muted.small', 'Палитру и тему можно сменить в любой момент — кнопкой с палитрой вверху страницы.'),
       h('label.check', wideCb, h('span', 'Интерфейс во всю ширину экрана', h('small', 'иначе содержимое стоит по центру; на компьютере переключается и кнопкой ↔ вверху'))),
       h('label.check', bgCb, h('span', 'Анимация фона', h('small', 'фон за карточками плавно движется и отзывается на прокрутку и курсор; на слабом компьютере можно выключить')))));
+    if (G.Guide) page.appendChild(G.Guide.profileCard());
     var fileInp = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' } });
     fileInp.addEventListener('change', async function () {
       var f = fileInp.files[0]; fileInp.value = ''; if (!f) return;
@@ -994,13 +1001,13 @@
     });
     var autoCb = h('input', { type: 'checkbox' }); autoCb.checked = !!u.settings.autoBackup;
     autoCb.addEventListener('change', function () { u.settings.autoBackup = autoCb.checked; A.save(); U.toast(autoCb.checked ? 'Автокопия включена: раз в день курс сам сохранит файл в «Загрузки»' : 'Автокопия выключена', 'ok'); });
-    page.appendChild(h('div.card.pad', h('h3', 'Резервная копия в файл'),
+    page.appendChild(h('div.card.pad', { 'data-guide': 'backup' }, h('h3', 'Резервная копия в файл'),
       h('p.muted', 'Файл прогресса нужен, чтобы перенести его на другой компьютер, передать преподавателю или восстановить, если браузер очистил данные. ' + (u.backup ? 'Последняя копия: ' + U.fmtDate(u.backup.at) + '.' : 'Копий ещё не было.')),
       h('div.row-btns',
         h('button.btn.primary', { onclick: function () { A.backupFile(u); A.dispatch(); } }, I('download', 18), 'Скачать копию'),
         h('button.btn', { onclick: function () { fileInp.click(); } }, 'Загрузить из файла'), fileInp),
       S.mode === 'fs' ? null : h('label.inline.mt', autoCb, ' Автокопия: раз в день сохранять файл в папку «Загрузки» (если браузер очищает данные при закрытии — включите обязательно)')));
-    var snapBox = h('div.card.pad', h('h3', 'Копии в браузере'), h('p.muted', 'Курс сам делает снимок прогресса не реже раза в 15 минут занятий и хранит 30 последних. Можно вернуться к любому — например, после случайного сброса.'));
+    var snapBox = h('div.card.pad', { 'data-guide': 'snapshots' }, h('h3', 'Копии в браузере'), h('p.muted', 'Курс сам делает снимок прогресса не реже раза в 15 минут занятий и хранит 30 последних. Можно вернуться к любому — например, после случайного сброса.'));
     var snapList = h('div', h('p.muted', 'Загружаю…')); snapBox.appendChild(snapList);
     page.appendChild(snapBox);
     S.snapshots(u.id).then(function (snaps) {
@@ -1020,13 +1027,13 @@
       snapList.appendChild(t);
     });
     var pin = h('input.inp', { type: 'password', inputmode: 'numeric', maxlength: 6, placeholder: 'новый PIN (пусто — убрать)' });
-    page.appendChild(h('div.card.pad', h('h3', 'PIN-код'), h('div.row-btns', pin, h('button.btn', {
+    page.appendChild(h('div.card.pad', { 'data-guide': 'pin' }, h('h3', 'PIN-код'), h('div.row-btns', pin, h('button.btn', {
       onclick: async function () {
         if (pin.value && !/^\d{4,6}$/.test(pin.value)) { U.toast('PIN — 4–6 цифр', 'warn'); return; }
         u.pinHash = pin.value ? await U.hash(pin.value) : null; A.save(); pin.value = ''; U.toast(u.pinHash ? 'PIN установлен' : 'PIN убран', 'ok');
       }
     }, 'Сохранить'))));
-    page.appendChild(h('div.row-btns',
+    page.appendChild(h('div.row-btns', { 'data-guide': 'prof-actions' },
       h('button.btn', { onclick: A.logout }, 'Выйти (сменить пользователя)'),
       h('a.btn', { href: '#/team' }, 'Сводка по группе'),
       h('a.btn', { href: '#/packs' }, 'Учебные базы'),

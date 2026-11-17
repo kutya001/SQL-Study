@@ -51,9 +51,9 @@
     // Последовательная загрузка модулей курса и приложения
     (function () {
       var files = COURSE.moduleFiles.map(function (f) { return 'content/modules/' + f; })
-        .concat(['content/trainer.js', 'content/cheatsheet.js', '?schemas/index.js',
+        .concat(['content/trainer.js', 'content/cheatsheet.js', 'content/guide.js', '?schemas/index.js',
           'js/app/util.js', 'js/app/icons.js', 'js/app/bg.js', 'js/app/storage.js', 'js/app/registry.js', 'js/app/editor.js', 'js/app/datagrid.js', 'js/app/grid.js',
-          'js/app/checker.js', 'js/app/widgets.js', 'js/app/app.js', 'js/app/schemapanel.js', 'js/app/erd.js', 'js/app/pages.js', 'js/app/packpages.js']);
+          'js/app/checker.js', 'js/app/widgets.js', 'js/app/app.js', 'js/app/schemapanel.js', 'js/app/erd.js', 'js/app/pages.js', 'js/app/packpages.js', 'js/app/guide.js']);
       var failed = [];
       function next(i) {
         if (i >= files.length) {

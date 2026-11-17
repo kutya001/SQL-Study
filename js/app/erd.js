@@ -201,13 +201,13 @@
     this.zoomLbl = h('span.erdc-zoom', '100%');
     this.resetBtn = h('button.btn.small.ghost', { type: 'button', title: 'Вернуть таблицы на исходные места', onclick: function () { self.resetPos(); } }, I('undo', 15), h('span.bl', 'Расставить заново'));
     this.bar = h('div.erdc-bar',
-      h('div.erdc-tools',
+      h('div.erdc-tools', { 'data-guide': 'erd-tools' },
         h('button.icon-btn.small', { type: 'button', title: 'Мельче', 'aria-label': 'Мельче', onclick: function () { self.zoomBy(1 / 1.25); } }, I('zoom-out', 17)),
         this.zoomLbl,
         h('button.icon-btn.small', { type: 'button', title: 'Крупнее', 'aria-label': 'Крупнее', onclick: function () { self.zoomBy(1.25); } }, I('zoom-in', 17)),
         h('button.btn.small.ghost', { type: 'button', title: 'Показать всю схему', onclick: function () { self.fit(); } }, I('fit', 15), h('span.bl', 'Вся схема')),
         this.resetBtn));
-    this.stage = h('div.erdc-stage', this.canvas, this.tip);
+    this.stage = h('div.erdc-stage', { 'data-guide': 'erd-stage' }, this.canvas, this.tip);
     this.hintEl = h('div.erdc-hint', I('hand', 15), h('span', 'Таблицы и фон можно тянуть. Щелчок по таблице закрепляет её связи, двойной — показывает данные. Масштаб — кнопками, Ctrl + колесо или двумя пальцами.'));
     // легенда: наведение (или щелчок) подсвечивает столбцы этого типа или связи этого вида
     var mk = function (cls, key, val, title, text, sw) {
@@ -234,7 +234,7 @@
       h('div.erdc-lg', h('span.erdc-lg-t', 'Связи'), this.relChips,
         h('span.erdc-marks', h('b', 'PK'), ' ключ · ', h('b.fk', 'FK'), ' ссылка')));
     this.legendBtn = h('button.erdc-lg-toggle', { type: 'button', onclick: function () { self.setLegend(!self.legendOpen); } });
-    this.legendEl = h('div.erdc-legend', this.legendBtn, this.legendBody);
+    this.legendEl = h('div.erdc-legend', { 'data-guide': 'erd-legend' }, this.legendBtn, this.legendBody);
     this.stage.appendChild(this.legendEl);
     this.setLegend(open, true);
     this.el = h('div.erdc', this.bar, this.stage, this.hintEl);
