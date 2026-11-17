@@ -45,11 +45,16 @@ async def scenario(browser, url, tag, errors):
     await pg.goto(url + '#/schema/bank'); await pg.wait_for_timeout(900)
     erd = await pg.evaluate("""(() => {
       const c = document.querySelector('.erdc-canvas'); if (!c) return null;
-      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0;
-      for (let i = 3; i < d.length; i += 4000) if (d[i] > 0) n++;
-      return { painted: n, tables: window.__erdLast.nodes.length, links: window.__erdLast.edges.length };
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data, seen = new Set();
+      for (let i = 0; i < d.length; i += 4 * 97) seen.add(d[i] + ',' + d[i + 1] + ',' + d[i + 2]);
+      const r = c.getBoundingClientRect(), k = window.devicePixelRatio || 1;
+      return { colors: seen.size, tables: window.__erdLast.nodes.length, links: window.__erdLast.edges.length,
+        canvas: c.width + 'x' + c.height, screen: (r.width * k) + 'x' + (r.height * k),
+        exact: Math.abs(c.width - r.width * k) <= 1 && Math.abs(c.height - r.height * k) <= 1 };
     })()""")
-    assert erd and erd['painted'] > 30 and erd['tables'] == 9 and erd['links'] == 8, f'{tag}: схема не нарисована: {erd}'
+    assert erd and erd['colors'] > 12 and erd['tables'] == 9 and erd['links'] == 8, f'{tag}: схема не нарисована: {erd}'
+    # холст схемы совпадает с экраном «пиксель в пиксель» — иначе браузер растягивает картинку и схема мутная
+    assert erd['exact'], f'{tag}: размер холста схемы не равен размеру на экране (схема будет мутной): {erd}'
     # тренажёр: фильтр по командам
     await pg.goto(url + '#/trainer/0/bank'); await pg.wait_for_timeout(500)
     await pg.locator('.chip.cmd', has_text='HAVING').first.click(); await pg.wait_for_timeout(400)

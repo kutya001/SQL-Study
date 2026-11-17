@@ -194,7 +194,9 @@
   P.build = function () {
     var self = this;
     this.canvas = h('canvas.erdc-canvas', { 'aria-label': 'Схема связей базы ' + this.pack.dbName, role: 'img' });
-    this.ctx = this.canvas.getContext('2d');
+    // Холст непрозрачный: свой фон рисуем сами. Так браузер сглаживает текст на холсте так же чётко,
+    // как обычный текст страницы (на прозрачном холсте сглаживание грубее), и сквозь схему не просвечивает фон.
+    this.ctx = this.canvas.getContext('2d', { alpha: false }) || this.canvas.getContext('2d');
     this.tip = h('div.erdc-tip');
     this.zoomLbl = h('span.erdc-zoom', '100%');
     this.resetBtn = h('button.btn.small.ghost', { type: 'button', title: 'Вернуть таблицы на исходные места', onclick: function () { self.resetPos(); } }, I('undo', 15), h('span.bl', 'Расставить заново'));
@@ -366,18 +368,22 @@
     var c = {
       dark: dark, text: v('--text', '#121a2e'), muted: v('--muted', '#5d6680'), faint: v('--faint', '#98a0b5'),
       primary: v('--primary', '#1a63d0'), xp: v('--xp', '#e8890c'),
-      card: dark ? 'rgba(28, 35, 60, .96)' : 'rgba(255, 255, 255, .97)',
+      card: dark ? '#1c233c' : '#ffffff', bg: dark ? '#111726' : '#fafbfd',
       line: dark ? 'rgba(255, 255, 255, .10)' : 'rgba(20, 30, 60, .09)',
       border: dark ? 'rgba(255, 255, 255, .16)' : 'rgba(20, 30, 60, .16)',
       shadow: dark ? 'rgba(0, 0, 0, .55)' : 'rgba(30, 40, 90, .20)',
-      dot: dark ? 'rgba(255, 255, 255, .06)' : 'rgba(20, 30, 60, .07)',
+      dot: dark ? 'rgba(255, 255, 255, .07)' : 'rgba(20, 30, 60, .09)',
       cat: {}, rel: {}
     };
     // шапки таблиц и подсветка строк — оттенки основного цвета выбранной палитры
     c.head = tint(c.primary, dark ? .20 : .10); c.headOn = tint(c.primary, dark ? .38 : .20); c.rowOn = tint(c.primary, dark ? .20 : .10);
-    // в тёмной теме карточка таблицы — чуть светлее «стекла» палитры, чтобы таблицы не сливались с полем
-    var sd = dark ? /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(v('--surface-solid', '')) : null;
-    if (sd) c.card = 'rgba(' + sd.slice(1).map(function (x) { return Math.round(parseInt(x, 16) * .94 + 15); }).join(', ') + ', .96)';
+    // поле схемы и карточки таблиц — сплошные цвета палитры: поле между фоном страницы и «стеклом»,
+    // карточка в тёмной теме чуть светлее «стекла», чтобы таблицы не сливались с полем
+    var hex3 = function (x) { var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(x); return m ? m.slice(1).map(function (q) { return parseInt(q, 16); }) : null; };
+    var sd = hex3(v('--surface-solid', '')), bg = hex3(v('--bg', ''));
+    var rgb = function (a) { return 'rgb(' + a.map(Math.round).join(', ') + ')'; };
+    if (sd && bg) c.bg = rgb(sd.map(function (x, i) { return dark ? x * .55 + bg[i] * .45 : x * .62 + bg[i] * .38; }));
+    if (sd && dark) c.card = rgb(sd.map(function (x) { return x * .94 + 15; }));
     // цвета типов и связей — из css/app.css (--cat-*, --rel-*); запасные значения — на случай старых стилей
     CATS.forEach(function (x) { c.cat[x[0]] = v('--cat-' + x[0], dark ? x[3] : x[2]); });
     RELS.forEach(function (x) { if (x[3]) c.rel[x[0]] = v('--rel-' + x[0], dark ? x[4] : x[3]); });
@@ -405,18 +411,25 @@
     } else if (this.pin) addNode(this.pin);
     return any ? f : null;
   };
+  // Чёткость. Холст совпадает с экраном «пиксель в пиксель» (см. resize), а рисунок ставится на сетку экрана:
+  //  — сдвиг схемы округляется до целого пикселя экрана;
+  //  — каждая таблица начинается с целого пикселя, её линии, рамка и строки текста тоже стоят на целых пикселях (paintNode).
+  // Без этого при масштабе схемы 83 % или масштабе системы 125 % линии и буквы попадают «между пикселями» и расплываются.
   P.paint = function () {
-    var ctx = this.ctx, dpr = this.dpr || 1, W = this.W, H = this.H, k = this.k, self = this;
+    var ctx = this.ctx, sx = this.sx || 1, sy = this.sy || sx, W = this.W, H = this.H, k = this.k, self = this;
     if (!W || !H) return;
     var C = this.C || (this.C = this.colors()), f = this.focus();
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, W, H);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1; ctx.fillStyle = C.bg; ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    // px — перевод координат схемы в пиксели экрана: масштаб и целый сдвиг
+    var px = this.px = { sx: sx * k, sy: sy * k, ox: Math.round(this.tx * sx), oy: Math.round(this.ty * sy), dev: sx };
     // фон-сетка из точек: движется и масштабируется вместе со схемой
     var step = 26 * k; while (step < 14) step *= 2;
     ctx.fillStyle = C.dot;
-    var ox = ((this.tx % step) + step) % step, oy = ((this.ty % step) + step) % step;
-    for (var gx = ox; gx < W; gx += step) for (var gy = oy; gy < H; gy += step) ctx.fillRect(gx - 1, gy - 1, 2, 2);
-    ctx.setTransform(dpr * k, 0, 0, dpr * k, dpr * this.tx, dpr * this.ty);
+    var dot = Math.max(1, Math.round(1.7 * sx)), half = dot >> 1;
+    var gx0 = ((this.tx % step) + step) % step, gy0 = ((this.ty % step) + step) % step;
+    for (var gx = gx0; gx < W; gx += step) for (var gy = gy0; gy < H; gy += step) ctx.fillRect(Math.round(gx * sx) - half, Math.round(gy * sy) - half, dot, dot);
+    ctx.setTransform(px.sx, 0, 0, px.sy, px.ox, px.oy);
 
     // --- связи
     var front = [];
@@ -436,9 +449,9 @@
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = col; ctx.fillStyle = col;
-    ctx.lineWidth = on ? 2.4 : 1.5;
+    ctx.lineWidth = Math.max(on ? 2.4 : 1.5, (on ? 2 : 1.25) / this.px.sx);   // на мелком масштабе линия не тоньше пикселя экрана
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    if (on) { ctx.shadowColor = col; ctx.shadowBlur = 10; }
+    if (on) { ctx.shadowColor = col; ctx.shadowBlur = 10 * this.px.dev; }
     if (e.opt) ctx.setLineDash([6, 5]);
     var m = 15;   // место под значки на концах
     ctx.beginPath();
@@ -456,7 +469,7 @@
     ctx.stroke();
     if (e.opt) {
       ctx.beginPath(); ctx.arc(p.x2 + p.sb * 12, p.y2, 3.6, 0, Math.PI * 2);
-      ctx.fillStyle = C.dark ? '#161c31' : '#ffffff'; ctx.fill(); ctx.stroke();
+      ctx.fillStyle = C.bg; ctx.fill(); ctx.stroke();
     }
     ctx.restore();
   };
@@ -474,65 +487,74 @@
     return text + '…';
   }
   P.paintNode = function (n, C, f) {
-    var ctx = this.ctx, hv = this.hover, isHover = hv && hv.node === n, isPin = this.pin === n;
+    var ctx = this.ctx, px = this.px, S = px.sx, Sy = px.sy, hv = this.hover, isHover = hv && hv.node === n, isPin = this.pin === n;
     var dim = f && !f.cat && !f.nodes[n.name];
+    // левый верхний угол таблицы — на целом пикселе экрана; дальше рисуем в координатах самой таблицы (0, 0 — её угол).
+    // qx / qy подгоняют размер или отступ под сетку экрана, line — толщина тонкой линии (целое число пикселей экрана).
+    var qx = function (v) { return Math.round(v * S) / S; }, qy = function (v) { return Math.round(v * Sy) / Sy; };
+    var w = qx(n.w), hgt = qy(n.h), line = Math.max(1, Math.round(Sy)) / Sy;
     ctx.save();
+    ctx.setTransform(S, 0, 0, Sy, Math.round(n.x * S + px.ox), Math.round(n.y * Sy + px.oy));
     ctx.globalAlpha = dim ? 0.3 : 1;
     // карточка с тенью
-    ctx.shadowColor = C.shadow; ctx.shadowBlur = isHover || isPin ? 26 : 16; ctx.shadowOffsetY = isHover || isPin ? 10 : 6;
-    rr(ctx, n.x, n.y, n.w, n.h, RADIUS); ctx.fillStyle = C.card; ctx.fill();
+    ctx.shadowColor = C.shadow; ctx.shadowBlur = (isHover || isPin ? 26 : 16) * px.dev; ctx.shadowOffsetY = (isHover || isPin ? 10 : 6) * px.dev;
+    rr(ctx, 0, 0, w, hgt, RADIUS); ctx.fillStyle = C.card; ctx.fill();
     ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
     // шапка
+    var head = qy(HEAD);
     ctx.save();
-    rr(ctx, n.x, n.y, n.w, n.h, RADIUS); ctx.clip();
+    rr(ctx, 0, 0, w, hgt, RADIUS); ctx.clip();
     ctx.fillStyle = isPin || (f && f.nodes && f.nodes[n.name]) ? C.headOn : C.head;
-    ctx.fillRect(n.x, n.y, n.w, HEAD);
+    ctx.fillRect(0, 0, w, head);
     ctx.restore();
     ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
     ctx.font = '700 13px ' + FONT_MONO; ctx.fillStyle = C.text;
-    ctx.fillText(clipText(ctx, n.name, n.w - 2 * PAD - 26), n.x + PAD, n.y + HEAD / 2 + 1);
-    // значок «показать данные» справа в шапке
-    var ix = n.x + n.w - 26, iy = n.y + 9, pv = isHover && hv.part === 'preview';
-    ctx.strokeStyle = pv ? C.primary : C.muted; ctx.lineWidth = 1.4; ctx.globalAlpha = (dim ? 0.3 : 1) * (pv ? 1 : 0.75);
-    rr(ctx, ix, iy, 15, 13, 3); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(ix, iy + 4.5); ctx.lineTo(ix + 15, iy + 4.5); ctx.moveTo(ix, iy + 8.8); ctx.lineTo(ix + 15, iy + 8.8); ctx.moveTo(ix + 5.5, iy + 4.5); ctx.lineTo(ix + 5.5, iy + 13); ctx.stroke();
+    ctx.fillText(clipText(ctx, n.name, n.w - 2 * PAD - 26), qx(PAD), qy(HEAD / 2 + 1));
+    // значок «показать данные» справа в шапке (линии — по сетке экрана)
+    var pv = isHover && hv.part === 'preview';
+    var lwi = Math.max(1, Math.round(1.4 * S)), off = (lwi % 2) * 0.5 / S;   // нечётная толщина — линия по центру пикселя
+    var ix = qx(n.w - 26) + off, iy = qy(9) + off, iw = qx(15), ih = qy(13), i1 = qy(4.5), i2 = qy(8.8), i3 = qx(5.5);
+    ctx.strokeStyle = pv ? C.primary : C.muted; ctx.lineWidth = lwi / S; ctx.globalAlpha = (dim ? 0.3 : 1) * (pv ? 1 : 0.75);
+    rr(ctx, ix, iy, iw, ih, 3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ix, iy + i1); ctx.lineTo(ix + iw, iy + i1); ctx.moveTo(ix, iy + i2); ctx.lineTo(ix + iw, iy + i2); ctx.moveTo(ix + i3, iy + i1); ctx.lineTo(ix + i3, iy + ih); ctx.stroke();
     ctx.globalAlpha = dim ? 0.3 : 1;
     // подпись таблицы
-    var y0 = n.y + HEAD;
+    var y0 = HEAD;
     if (n.sub) {
       ctx.font = '11.5px ' + FONT_SANS; ctx.fillStyle = C.muted;
       var cnt = n.t.rowCount !== undefined ? ' · ' + n.t.rowCount + ' стр.' : '';
-      ctx.fillText(clipText(ctx, (n.t.title || '') + cnt, n.w - 2 * PAD), n.x + PAD, y0 + SUB / 2 + 1);
+      ctx.fillText(clipText(ctx, (n.t.title || '') + cnt, n.w - 2 * PAD), qx(PAD), qy(y0 + SUB / 2 + 1));
       y0 += SUB;
-      ctx.fillStyle = C.line; ctx.fillRect(n.x, y0 - 0.5, n.w, 1);
+      ctx.fillStyle = C.line; ctx.fillRect(0, qy(y0), w, line);
     }
     // столбцы
     for (var i = 0; i < n.rows.length; i++) {
-      var r = n.rows[i], ry = y0 + i * ROW, mid = ry + ROW / 2 + 1;
+      var r = n.rows[i], ry = qy(y0 + i * ROW), ry2 = qy(y0 + (i + 1) * ROW), mid = qy(y0 + i * ROW + ROW / 2 + 1);
       var rowOn = (f && f.rows && f.rows[n.name + '.' + i]) || (isHover && hv.part === 'row' && hv.row === i);
       var catOn = f && f.cat ? r.cat === f.cat : null;
-      if (rowOn || catOn) { ctx.fillStyle = catOn ? hexA(C.cat[r.cat], C.dark ? 0.24 : 0.14) : C.rowOn; ctx.fillRect(n.x + 1, ry + 1, n.w - 2, ROW - 1); }
-      if (i) { ctx.fillStyle = C.line; ctx.fillRect(n.x + PAD, ry, n.w - 2 * PAD, 1); }
+      if (rowOn || catOn) { ctx.fillStyle = catOn ? hexA(C.cat[r.cat], C.dark ? 0.24 : 0.14) : C.rowOn; ctx.fillRect(line, ry + line, w - 2 * line, ry2 - ry - line); }
+      if (i) { ctx.fillStyle = C.line; ctx.fillRect(qx(PAD), ry, w - 2 * qx(PAD), line); }
       ctx.globalAlpha = (dim ? 0.3 : 1) * (catOn === false ? 0.32 : 1);
-      var tx = n.x + PAD;
+      var tx = qx(PAD);
       if (r.pk || r.fk) {   // значок PK / FK
         var bc = r.pk ? C.xp : C.primary;
-        rr(ctx, tx, mid - 7, 20, 14, 4); ctx.fillStyle = hexA(bc, C.dark ? 0.24 : 0.14); ctx.fill();
+        rr(ctx, tx, mid - qy(7), qx(20), qy(14), 4); ctx.fillStyle = hexA(bc, C.dark ? 0.24 : 0.14); ctx.fill();
         ctx.font = '700 8.5px ' + FONT_SANS; ctx.fillStyle = bc; ctx.textAlign = 'center';
-        ctx.fillText(r.pk ? 'PK' : 'FK', tx + 10, mid + 0.5);
-        ctx.textAlign = 'left'; tx += 25;
+        ctx.fillText(r.pk ? 'PK' : 'FK', tx + qx(10), mid + line * 0.5);
+        ctx.textAlign = 'left'; tx += qx(25);
       }
       ctx.font = (r.pk ? '700 ' : '') + '12px ' + FONT_MONO;
       ctx.fillStyle = r.fk && !r.pk ? C.primary : C.text;
-      ctx.fillText(clipText(ctx, r.name, n.w - (tx - n.x) - PAD - r.tw - 12), tx, mid);
+      ctx.fillText(clipText(ctx, r.name, n.w - tx - PAD - r.tw - 12), tx, mid);
       ctx.font = '12px ' + FONT_MONO; ctx.fillStyle = C.cat[r.cat]; ctx.textAlign = 'right';
-      ctx.fillText(r.type, n.x + n.w - PAD, mid);
+      ctx.fillText(r.type, w - qx(PAD), mid);
       ctx.textAlign = 'left';
       ctx.globalAlpha = dim ? 0.3 : 1;
     }
-    // рамка
-    rr(ctx, n.x, n.y, n.w, n.h, RADIUS);
-    ctx.lineWidth = isPin ? 2 : 1; ctx.strokeStyle = isPin || isHover ? C.primary : C.border;
+    // рамка: целое число пикселей экрана, ровно по краю карточки
+    var lwb = Math.max(1, Math.round((isPin ? 2 : 1) * S)) / S;
+    rr(ctx, lwb / 2, lwb / 2, w - lwb, hgt - lwb, RADIUS - lwb / 2);
+    ctx.lineWidth = lwb; ctx.strokeStyle = isPin || isHover ? C.primary : C.border;
     ctx.globalAlpha = (dim ? 0.3 : 1) * (isPin || isHover ? 0.95 : 1);
     ctx.stroke();
     ctx.restore();
@@ -560,19 +582,37 @@
     if (window.innerWidth < 768) hgt = Math.max(360, Math.min(hgt, 640));
     this.stage.style.height = hgt + 'px';
   };
+  // Размер холста. Он должен совпадать с экраном «пиксель в пиксель»: иначе браузер растягивает готовую картинку
+  // и вся схема становится мутной. Поэтому:
+  //  — меряем сам холст, а не область .erdc-stage (у неё есть рамка, и холст на 2 px меньше);
+  //  — число пикселей экрана берём у браузера (devBox приходит из ResizeObserver, см. events): при масштабе системы 125 %
+  //    или масштабе страницы 110 % размер в пикселях дробный, и округлить его «как на экране» может только браузер;
+  //  — на экранах с плотностью 3 (телефоны) рисуем в полную плотность, без занижения.
+  var MAX_PIXELS = 16e6;   // предел размера холста (4K-экран целиком — 8,3 млн)
   P.resize = function () {
     if (!this.W) this.fitHeight();
-    var r = this.stage.getBoundingClientRect();
-    if (!r.width || !r.height) return false;
-    var dpr = Math.min(window.devicePixelRatio || 1, 2.5), first = !this.W;
-    var W = Math.round(r.width), H = Math.round(r.height);
-    if (W !== this.W || H !== this.H || dpr !== this.dpr) {
+    var cv = this.canvas, ratio = window.devicePixelRatio || 1, d = this.devBox, cw, ch, bw, bh;
+    if (d && d.cw && d.ch) { cw = d.cw; ch = d.ch; } else { cw = cv.clientWidth; ch = cv.clientHeight; }
+    bw = Math.round(cw * ratio); bh = Math.round(ch * ratio);
+    // точный размер от браузера отличается от расчётного не больше чем на пиксель; если расхождение больше
+    // (браузер его не сообщает или страница открыта в режиме эмуляции устройства) — остаётся расчётный
+    if (d && d.w && d.h && Math.abs(d.w - cw * ratio) <= 1 && Math.abs(d.h - ch * ratio) <= 1) { bw = d.w; bh = d.h; }
+    if (!cw || !ch || !bw || !bh) return false;
+    if (bw * bh > MAX_PIXELS) { var q = Math.sqrt(MAX_PIXELS / (bw * bh)); bw = Math.floor(bw * q); bh = Math.floor(bh * q); }
+    var first = !this.W, changed = false;
+    if (bw !== cv.width || bh !== cv.height || cw !== this.W || ch !== this.H) {
       // при изменении размера окна схема остаётся на месте относительно центра
-      if (!first) { this.tx += (W - this.W) / 2; this.ty += (H - this.H) / 2; }
-      this.W = W; this.H = H; this.dpr = dpr;
-      this.canvas.width = Math.round(W * dpr); this.canvas.height = Math.round(H * dpr);
+      if (!first) { this.tx += (cw - this.W) / 2; this.ty += (ch - this.H) / 2; }
+      this.W = cw; this.H = ch;
+      this.sx = bw / cw; this.sy = bh / ch; this.dpr = this.sx;   // пикселей экрана на один пиксель страницы
+      if (cv.width !== bw) cv.width = bw;
+      if (cv.height !== bh) cv.height = bh;
+      changed = true;
     }
-    if (first) { this.arrange(true); this.home(); } else this.invalidate();
+    if (first) { this.arrange(true); this.home(); }
+    // смена размера стирает холст — рисуем сразу, не дожидаясь следующего кадра, иначе схема мигнёт пустым полем
+    if (first || changed) { if (this.raf) { cancelAnimationFrame(this.raf); this.raf = 0; } this.paint(); }
+    else this.invalidate();
     return true;
   };
   // совместимость с прежним вызовом: draw() — пересчитать размер и нарисовать
@@ -701,7 +741,17 @@
     cv.addEventListener('dblclick', function (e) { var p = pos(e), w = self.toWorld(p.x, p.y); if (!self.hit(w.x, w.y)) self.fit(); });
 
     // размер области и смена темы
-    if (window.ResizeObserver) { this.ro = new ResizeObserver(function () { self.resize(); }); this.ro.observe(this.stage); }
+    if (window.ResizeObserver) {
+      // следим за самим холстом; браузер сообщает его точный размер в пикселях экрана (devicePixelContentBoxSize) —
+      // в том числе когда меняется только масштаб страницы или окно переезжает на другой монитор
+      this.ro = new ResizeObserver(function (list) {
+        var e = list[list.length - 1], box = e.devicePixelContentBoxSize && e.devicePixelContentBoxSize[0];
+        self.devBox = { cw: e.contentRect.width, ch: e.contentRect.height, w: box ? box.inlineSize : 0, h: box ? box.blockSize : 0 };
+        if (!document.body.contains(self.el)) { self.destroy(); return; }
+        self.resize();
+      });
+      try { this.ro.observe(cv, { box: 'device-pixel-content-box' }); } catch (err) { this.ro.observe(cv); }
+    }
     this.onWin = U.debounce(function () { if (!document.body.contains(self.el)) { self.destroy(); return; } self.fitHeight(); self.resize(); }, 120);
     window.addEventListener('resize', this.onWin);
     this.mo = new MutationObserver(function () { if (!document.body.contains(self.el)) { self.destroy(); return; } self.C = null; self.invalidate(); });
