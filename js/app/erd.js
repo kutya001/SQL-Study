@@ -18,7 +18,7 @@
     ['dec', 'Дробные и деньги', '#0d9488', '#5fd6c8'],
     ['str', 'Текст', '#15803d', '#74dd9c'],
     ['date', 'Дата и время', '#c2610a', '#ffb866'],
-    ['bit', 'Да / нет', '#9333ea', '#d3a6ff'],
+    ['bit', 'Да / нет', '#8a6d0b', '#e0c060'],
     ['other', 'Другое', '#64748b', '#9aa7bd']
   ];
   function typeCat(type) {
@@ -32,7 +32,7 @@
   }
   A.typeCat = typeCat;
   var RELS = [
-    ['many', 'Один ко многим', 'одной строке главной таблицы соответствует много строк подчинённой', '#4f46e5', '#9d9bff'],
+    ['many', 'Один ко многим', 'одной строке главной таблицы соответствует много строк подчинённой', '#2468e8', '#8ab4ff'],
     ['one', 'Один к одному', 'значения ссылки не повторяются: одной строке соответствует не больше одной', '#0d9488', '#5fd6c8'],
     ['self', 'Иерархия', 'таблица ссылается сама на себя: руководитель, родительская запись', '#c2610a', '#ffb866'],
     ['opt', 'Необязательная', 'в столбце-ссылке встречается NULL — связи может не быть (пунктир)', null, null]
@@ -347,22 +347,37 @@
   };
 
   /* ---------------- рисование ---------------- */
+  // Цвет '#rrggbb' / '#rgb' / 'rgb(r, g, b)' с заданной прозрачностью — для полупрозрачных заливок на холсте
+  function tint(color, alpha) {
+    var m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(color).trim()), r, g, b;
+    if (m) {
+      var x = m[1]; if (x.length === 3) x = x.replace(/./g, '$&$&');
+      r = parseInt(x.slice(0, 2), 16); g = parseInt(x.slice(2, 4), 16); b = parseInt(x.slice(4, 6), 16);
+    } else {
+      m = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i.exec(String(color).trim());
+      if (!m) return color;
+      r = +m[1]; g = +m[2]; b = +m[3];
+    }
+    return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha + ')';
+  }
   P.colors = function () {
     var cs = getComputedStyle(document.documentElement), dark = document.documentElement.getAttribute('data-theme') === 'dark';
     var v = function (name, def) { var x = cs.getPropertyValue(name).trim(); return x || def; };
     var c = {
       dark: dark, text: v('--text', '#121a2e'), muted: v('--muted', '#5d6680'), faint: v('--faint', '#98a0b5'),
-      primary: v('--primary', '#4f46e5'), xp: v('--xp', '#e8890c'),
+      primary: v('--primary', '#1a63d0'), xp: v('--xp', '#e8890c'),
       card: dark ? 'rgba(28, 35, 60, .96)' : 'rgba(255, 255, 255, .97)',
-      head: dark ? 'rgba(143, 140, 255, .20)' : 'rgba(79, 70, 229, .10)',
-      headOn: dark ? 'rgba(143, 140, 255, .38)' : 'rgba(79, 70, 229, .20)',
       line: dark ? 'rgba(255, 255, 255, .10)' : 'rgba(20, 30, 60, .09)',
       border: dark ? 'rgba(255, 255, 255, .16)' : 'rgba(20, 30, 60, .16)',
-      rowOn: dark ? 'rgba(143, 140, 255, .20)' : 'rgba(79, 70, 229, .10)',
       shadow: dark ? 'rgba(0, 0, 0, .55)' : 'rgba(30, 40, 90, .20)',
       dot: dark ? 'rgba(255, 255, 255, .06)' : 'rgba(20, 30, 60, .07)',
       cat: {}, rel: {}
     };
+    // шапки таблиц и подсветка строк — оттенки основного цвета выбранной палитры
+    c.head = tint(c.primary, dark ? .20 : .10); c.headOn = tint(c.primary, dark ? .38 : .20); c.rowOn = tint(c.primary, dark ? .20 : .10);
+    // в тёмной теме карточка таблицы — чуть светлее «стекла» палитры, чтобы таблицы не сливались с полем
+    var sd = dark ? /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(v('--surface-solid', '')) : null;
+    if (sd) c.card = 'rgba(' + sd.slice(1).map(function (x) { return Math.round(parseInt(x, 16) * .94 + 15); }).join(', ') + ', .96)';
     // цвета типов и связей — из css/app.css (--cat-*, --rel-*); запасные значения — на случай старых стилей
     CATS.forEach(function (x) { c.cat[x[0]] = v('--cat-' + x[0], dark ? x[3] : x[2]); });
     RELS.forEach(function (x) { if (x[3]) c.rel[x[0]] = v('--rel-' + x[0], dark ? x[4] : x[3]); });
@@ -690,7 +705,7 @@
     this.onWin = U.debounce(function () { if (!document.body.contains(self.el)) { self.destroy(); return; } self.fitHeight(); self.resize(); }, 120);
     window.addEventListener('resize', this.onWin);
     this.mo = new MutationObserver(function () { if (!document.body.contains(self.el)) { self.destroy(); return; } self.C = null; self.invalidate(); });
-    this.mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    this.mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-palette'] });
   };
   P.destroy = function () {
     if (this.ro) this.ro.disconnect();

@@ -30,12 +30,12 @@
 
   // Облака: положение в долях экрана, радиус в долях большей стороны, оттенок, глубина (сила параллакса), скорость, фаза
   var ORBS = [
-    { x: .10, y: .08, r: .46, hue: 244, d: .30, sp: .10, ph: 0.0 },
-    { x: .90, y: .20, r: .40, hue: 172, d: .55, sp: .08, ph: 1.7 },
-    { x: .52, y: .95, r: .46, hue: 322, d: .40, sp: .07, ph: 3.1 },
-    { x: .28, y: .52, r: .28, hue: 268, d: .80, sp: .13, ph: 4.4 },
-    { x: .76, y: .66, r: .32, hue: 205, d: .65, sp: .09, ph: 5.3 },
-    { x: .04, y: .88, r: .28, hue: 34, d: .90, sp: .11, ph: 2.4 }
+    { x: .10, y: .08, r: .46, hue: 214, d: .30, sp: .10, ph: 0.0 },
+    { x: .90, y: .20, r: .40, hue: 190, d: .55, sp: .08, ph: 1.7 },
+    { x: .52, y: .95, r: .46, hue: 204, d: .40, sp: .07, ph: 3.1 },
+    { x: .28, y: .52, r: .28, hue: 180, d: .80, sp: .13, ph: 4.4 },
+    { x: .76, y: .66, r: .32, hue: 216, d: .65, sp: .09, ph: 5.3 },
+    { x: .04, y: .88, r: .28, hue: 42, d: .90, sp: .11, ph: 2.4 }
   ];
 
   function wrap(v, lo, hi) { var n = hi - lo; return ((((v - lo) % n) + n) % n) + lo; }
@@ -61,7 +61,7 @@
     window.addEventListener('touchmove', touch, { passive: true });
     window.addEventListener('touchend', function () { ptr.live = false; }, { passive: true });
     document.addEventListener('visibilitychange', function () { if (document.hidden) stop(); else if (B.active) start(); });
-    new MutationObserver(readTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    new MutationObserver(readTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-palette'] });
     readTheme(); resize();
   }
   function touch(e) {
@@ -69,7 +69,31 @@
     ptr.x = p.clientX; ptr.y = p.clientY; lastActive = last; ptr.live = true;
     if (!ptr.seen) { ptr.seen = true; ptr.sx = ptr.x; ptr.sy = ptr.y; }
   }
-  function readTheme() { dark = document.documentElement.getAttribute('data-theme') === 'dark'; }
+  // Тема и палитра. Цвета фона задаются в css/app.css: --bg-hues (оттенки шести облаков),
+  // --bg-sat (насыщенность, 0..1), --bg-glow (оттенок света под курсором), --bg-dot (цвет точек, «r, g, b»)
+  // При смене палитры цвета не прыгают: текущие значения (hue, sat, glow) плавно догоняют целевые (to, satTo, glowTo).
+  var pal = { sat: 1, satTo: 1, glow: 205, glowTo: 205, dot: '26, 99, 208', ready: false };
+  function readTheme() {
+    dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var cs = getComputedStyle(document.documentElement);
+    var hues = cs.getPropertyValue('--bg-hues').split(',').map(function (x) { return parseFloat(x); }).filter(function (x) { return isFinite(x); });
+    if (hues.length) ORBS.forEach(function (o, i) { o.to = hues[i % hues.length]; });
+    var sat = parseFloat(cs.getPropertyValue('--bg-sat')); pal.satTo = isFinite(sat) ? Math.max(0, Math.min(1, sat)) : 1;
+    var glow = parseFloat(cs.getPropertyValue('--bg-glow')); pal.glowTo = isFinite(glow) ? glow : ORBS[0].to;
+    var dot = cs.getPropertyValue('--bg-dot').trim(); if (/^\d+\s*,\s*\d+\s*,\s*\d+$/.test(dot)) pal.dot = dot;
+    if (!pal.ready) { pal.ready = true; easePalette(1); }   // первый раз — сразу, без перехода
+    lastActive = last;                                      // смена палитры «будит» фон, даже если он шёл в медленном режиме
+  }
+  // Кратчайший поворот оттенка: из 350° в 10° — через 0°, а не через весь круг
+  function turn(from, to, k) { return (from + ((((to - from) % 360) + 540) % 360 - 180) * k + 360) % 360; }
+  // Пока оттенок далёк от целевого, облако бледнеет: по пути от янтаря к океану цвет не проходит через чужие яркие тона
+  function far(from, to) { var d = Math.abs((((to - from) % 360) + 540) % 360 - 180); return d <= 24 ? 1 : Math.max(0, 1 - (d - 24) / 60); }
+  function easePalette(k) {
+    for (var i = 0; i < ORBS.length; i++) { var o = ORBS[i]; if (o.to !== undefined) o.hue = turn(o.hue, o.to, k); }
+    pal.sat += (pal.satTo - pal.sat) * k;
+    pal.glow = turn(pal.glow, pal.glowTo, k);
+  }
+  B.refresh = function () { if (cOrbs) readTheme(); };
 
   function resize() {
     W = window.innerWidth; H = window.innerHeight;
@@ -129,7 +153,10 @@
     xo.clearRect(0, 0, w, h);
     xo.globalCompositeOperation = dark ? 'lighter' : 'source-over';
     var stretch = 1 + Math.min(0.45, Math.abs(vel) * 0.00045);          // быстрая прокрутка вытягивает облака
-    var hueShift = sScroll * 0.022 + t * 1.6;                            // оттенок плывёт со временем и с прокруткой
+    // оттенок плавно колеблется со временем и с прокруткой — в пределах своей палитры, не уходя в чужие цвета
+    var hueShift = Math.sin(t * 0.07) * 8 + Math.sin(sScroll * 0.0014) * 12;
+    easePalette(0.09);
+    var S1 = Math.round(88 * pal.sat), S2 = Math.round(92 * pal.sat);
     var mxn = ptr.seen ? (ptr.sx / W - 0.5) : 0, myn = ptr.seen ? (ptr.sy / H - 0.5) : 0;
     for (var i = 0; i < ORBS.length; i++) {
       var o = ORBS[i], r = o.r * big * (1 + 0.06 * Math.sin(t * 0.31 + o.ph));
@@ -138,16 +165,17 @@
       y = wrap(y, -r * 0.9, h + r * 0.9);
       // к курсору: ближние слои смещаются сильнее
       x += mxn * w * 0.10 * o.d * ptr.on; y += myn * h * 0.10 * o.d * ptr.on;
-      var hue = (o.hue + hueShift) % 360;
+      var hue = Math.round((o.hue + hueShift * (i % 2 ? -1 : 1) + 360) % 360 * 10) / 10;
+      var sf = o.to === undefined ? 1 : far(o.hue, o.to), s1 = Math.round(S1 * sf), s2 = Math.round(S2 * sf);
       var g = xo.createRadialGradient(x, y, 0, x, y, r);
       if (dark) {
-        g.addColorStop(0, 'hsla(' + hue + ', 85%, 58%, 0.30)');
-        g.addColorStop(0.5, 'hsla(' + hue + ', 85%, 52%, 0.12)');
+        g.addColorStop(0, 'hsla(' + hue + ', ' + s1 + '%, 58%, 0.30)');
+        g.addColorStop(0.5, 'hsla(' + hue + ', ' + s1 + '%, 52%, 0.12)');
       } else {
-        g.addColorStop(0, 'hsla(' + hue + ', 92%, 74%, 0.52)');
-        g.addColorStop(0.5, 'hsla(' + hue + ', 92%, 78%, 0.22)');
+        g.addColorStop(0, 'hsla(' + hue + ', ' + s2 + '%, 74%, 0.52)');
+        g.addColorStop(0.5, 'hsla(' + hue + ', ' + s2 + '%, 78%, 0.22)');
       }
-      g.addColorStop(1, 'hsla(' + hue + ', 90%, 70%, 0)');
+      g.addColorStop(1, 'hsla(' + hue + ', ' + s2 + '%, 70%, 0)');
       xo.fillStyle = g;
       xo.save();
       xo.translate(x, y); xo.scale(1, stretch); xo.translate(-x, -y);
@@ -156,10 +184,10 @@
     }
     // свет под курсором
     if (ptr.on > 0.02) {
-      var cx = ptr.sx * OS, cy = ptr.sy * OS, cr = big * 0.24, ch = (250 + hueShift * 0.5) % 360;
+      var cx = ptr.sx * OS, cy = ptr.sy * OS, cr = big * 0.24, ch = Math.round((pal.glow + hueShift * 0.5 + 360) % 360), cs2 = Math.round(95 * pal.sat * far(pal.glow, pal.glowTo));
       var cg = xo.createRadialGradient(cx, cy, 0, cx, cy, cr);
-      cg.addColorStop(0, 'hsla(' + ch + ', 95%, ' + (dark ? 66 : 80) + '%, ' + (dark ? 0.30 : 0.50) * ptr.on + ')');
-      cg.addColorStop(1, 'hsla(' + ch + ', 95%, 70%, 0)');
+      cg.addColorStop(0, 'hsla(' + ch + ', ' + cs2 + '%, ' + (dark ? 66 : 80) + '%, ' + (dark ? 0.30 : 0.50) * ptr.on + ')');
+      cg.addColorStop(1, 'hsla(' + ch + ', ' + cs2 + '%, 70%, 0)');
       xo.fillStyle = cg; xo.fillRect(cx - cr, cy - cr, 2 * cr, 2 * cr);
     }
   }
@@ -168,7 +196,7 @@
     var ctx = xd, n = dots.length, i, j, d;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
-    var col = dark ? '190, 200, 255' : '79, 70, 229';
+    var col = pal.dot;
     var px = ptr.sx, py = ptr.sy, near = 170, push = 150;
     var streak = Math.max(-34, Math.min(34, vel * 0.03));
     for (i = 0; i < n; i++) {

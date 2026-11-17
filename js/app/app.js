@@ -48,7 +48,8 @@
       lessons: {}, items: {}, ach: {}, modulesDone: {},
       stats: { runs: 0, errors: 0, checks: 0, solved: 0, firstTry: 0, firstTryStreak: 0, sandboxRuns: 0, hints: 0, solutionsShown: 0 },
       sandbox: '-- Песочница: пишите любые SELECT-запросы к учебной базе\nSELECT TOP (10) *\nFROM Clients;',
-      settings: { theme: 'light' }, last: null, log: []
+      // новая учётная запись наследует оформление, выбранное на странице входа
+      settings: { theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light', palette: A.palette() }, last: null, log: []
     };
   }
   A.save = function () { if (A.user) { S.save(A.user); autoBackup(); } };
@@ -280,13 +281,7 @@
     document.body.classList.toggle('side-mini', mini);
     try { localStorage.setItem('sqlkurs.side', mini ? 'mini' : 'full'); } catch (e) { }
   };
-  A.toggleTheme = function () {
-    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-    var t = cur === 'dark' ? 'light' : 'dark';
-    if (A.user) { A.user.settings.theme = t; A.save(); }
-    try { localStorage.setItem('sqlkurs.theme', t); } catch (e) { }
-    A.applyTheme(); A.renderTop();
-  };
+  A.toggleTheme = function () { A.setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); };
   function navItem(x, route, cls) {
     var active = x.re.test(route);
     return h('a.' + (cls || 'nav-item') + (active ? '.active' : ''), { href: x.href, title: x.title, 'aria-current': active ? 'page' : null },
@@ -325,6 +320,7 @@
           h('span.su-main', h('span.su-name', u.name), h('span.su-rank', r.name + ' · ' + u.xp + ' XP'), h('span.su-bar', h('i', { style: { width: pct + '%' } })))),
         h('div.side-actions',
           h('button.icon-btn', { title: dark ? 'Светлая тема' : 'Тёмная тема', 'aria-label': 'Сменить тему', onclick: A.toggleTheme }, I(dark ? 'sun' : 'moon')),
+          h('button.icon-btn.side-pal', { title: 'Оформление: тема и палитра', 'aria-label': 'Оформление', onclick: A.showAppearance }, I('palette')),
           h('button.icon-btn.side-collapse', { title: 'Свернуть панель', 'aria-label': 'Свернуть панель', onclick: A.toggleSide }, I('sidebar')),
           h('button.icon-btn', { title: 'Сменить пользователя', 'aria-label': 'Выйти', onclick: function () { A.closeDrawer(); A.logout(); } }, I('logout')))));
     }
@@ -336,6 +332,7 @@
       h('span.pill.streak', { title: 'Дней подряд с занятиями' }, I('flame', 16), String(u.streak.days)),
       h('span.pill.xp', { title: r.name + ': ' + u.xp + ' XP' + (r.next ? ' (до следующего ранга — ' + (r.next - u.xp) + ')' : '') }, I('star', 16), String(u.xp)),
       h('button.icon-btn.tb-wide', { title: wide ? 'Вернуть обычную ширину (по центру)' : 'Растянуть на всю ширину экрана', 'aria-label': 'Ширина интерфейса', 'aria-pressed': wide ? 'true' : 'false', onclick: A.toggleWide }, I(wide ? 'narrow' : 'widen')),
+      h('button.icon-btn.tb-pal', { title: 'Оформление: тема и палитра', 'aria-label': 'Оформление', onclick: A.showAppearance }, I('palette')),
       h('button.icon-btn.tb-theme', { title: dark ? 'Светлая тема' : 'Тёмная тема', 'aria-label': 'Сменить тему', onclick: A.toggleTheme }, I(dark ? 'sun' : 'moon')),
       h('a.tb-avatar', { href: '#/profile', title: u.name }, h('span.avatar.sm', initials(u.name)))));
 
@@ -384,14 +381,99 @@
     window.addEventListener('resize', U.debounce(function () { if (!isMobile()) { A.closeDrawer(); document.body.classList.remove('bars-hidden', 'kb-open'); } }, 150));
   })();
 
-  /* ---------------- Тема ---------------- */
+  /* ---------------- Тема и палитра ---------------- */
+  // Палитры: цвета каждой — в css/app.css (раздел «Палитры», блоки [data-palette="id"]). Первая — по умолчанию.
+  A.PALETTES = [
+    { id: 'ocean', name: 'Океан', hint: 'синий и бирюзовый' },
+    { id: 'sky', name: 'Небо и солнце', hint: 'голубой и тёплый жёлтый' },
+    { id: 'aqua', name: 'Аквамарин', hint: 'бирюзовый и мятный' },
+    { id: 'emerald', name: 'Изумруд', hint: 'зелёный и бирюзовый' },
+    { id: 'forest', name: 'Лес и песок', hint: 'оливковый и песочный' },
+    { id: 'amber', name: 'Янтарь', hint: 'оранжевый и золотой' },
+    { id: 'navy', name: 'Полночь и золото', hint: 'тёмно-синий и золото' },
+    { id: 'graphite', name: 'Графит', hint: 'спокойный серо-синий' }
+  ];
+  A.palette = function () {
+    var id = A.pref('palette');
+    return A.PALETTES.some(function (p) { return p.id === id; }) ? id : A.PALETTES[0].id;
+  };
+  A.setPalette = function (id) {
+    if (!A.PALETTES.some(function (p) { return p.id === id; }) || id === A.palette()) return;
+    smoothColors();
+    A.setPref('palette', id);
+  };
+  A.setTheme = function (t) {
+    t = t === 'dark' ? 'dark' : 'light';
+    if (document.documentElement.getAttribute('data-theme') === t) return;
+    smoothColors();
+    if (A.user) { A.user.settings.theme = t; A.save(); }
+    try { localStorage.setItem('sqlkurs.theme', t); } catch (e) { }
+    A.applyTheme(); A.renderTop();
+  };
+  // На полсекунды включает плавный переход цветов (css: html.pal-anim), чтобы смена палитры не «мигала»
+  var smoothTimer = 0;
+  function smoothColors() {
+    var reduce = false;
+    try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { }
+    if (reduce) return;
+    document.documentElement.classList.add('pal-anim');
+    clearTimeout(smoothTimer);
+    smoothTimer = setTimeout(function () { document.documentElement.classList.remove('pal-anim'); }, 650);
+  }
+  // Значок вкладки: C1 и C2 — два цвета градиента палитры
+  var FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='C1'/%3E%3Cstop offset='1' stop-color='C2'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url%28%23g%29'/%3E%3Cg fill='none' stroke='white' stroke-width='2' stroke-linecap='round'%3E%3Cellipse cx='16' cy='10' rx='7' ry='2.8'/%3E%3Cpath d='M9 10v12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V10M9 16c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8'/%3E%3C/g%3E%3C/svg%3E";
+  // Плитки выбора палитры. Каждая плитка красится своей палитрой (атрибут data-palette), поэтому образец всегда показывает
+  // настоящие цвета — и для светлой, и для тёмной темы.
+  A.palettePicker = function () {
+    var cur = A.palette();
+    return h('div.pal-grid', { role: 'group', 'aria-label': 'Палитра' }, A.PALETTES.map(function (p) {
+      return h('button.pal-card' + (p.id === cur ? '.on' : ''), {
+        type: 'button', 'data-palette': p.id, 'aria-pressed': p.id === cur ? 'true' : 'false', title: p.name + ' — ' + p.hint,
+        onclick: function () { A.setPalette(p.id); }
+      },
+        h('span.pal-sw', { 'aria-hidden': 'true' }, h('i.pal-b1'), h('i.pal-b2'),
+          h('span.pal-mini', h('i.pal-l1'), h('i.pal-l2'), h('i.pal-btn'))),
+        h('span.pal-txt', h('b', p.name), h('small', p.hint)),
+        h('span.pal-ok', { 'aria-hidden': 'true' }, I('check', 14)));
+    }));
+  };
+  // Переключатель «Светлая / Тёмная»
+  A.themeSwitch = function () {
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    return h('div.seg.theme-seg', { role: 'group', 'aria-label': 'Тема' }, [['light', 'Светлая', 'sun'], ['dark', 'Тёмная', 'moon']].map(function (x) {
+      return h('button.seg-btn' + (x[0] === cur ? '.active' : ''), { type: 'button', 'data-theme-val': x[0], 'aria-pressed': x[0] === cur ? 'true' : 'false', onclick: function () { A.setTheme(x[0]); } }, I(x[2], 16), x[1]);
+    }));
+  };
+  // Окно «Оформление»: тема и палитра. Открывается кнопкой с палитрой в верхней панели, в меню и на странице входа.
+  A.showAppearance = function () {
+    if (U.qs('.modal .pal-grid')) return;
+    A.closeDrawer();
+    U.modal('Оформление', h('div.appearance',
+      h('div.ap-row', h('span.ap-cap', 'Тема'), A.themeSwitch()),
+      h('div.ap-cap', 'Палитра'),
+      A.palettePicker(),
+      h('p.muted.small', 'Цвета меняются сразу. Выбор запоминается' + (A.user ? ' в вашем прогрессе и на этом устройстве.' : ' на этом устройстве.'))),
+      [{ text: 'Готово', primary: true }]);
+  };
   A.applyTheme = function () {
     var saved = null;
     try { saved = localStorage.getItem('sqlkurs.theme'); } catch (e) { }
     var t = (A.user && A.user.settings && A.user.settings.theme) || saved || 'light';
     if (t !== 'dark') t = 'light';
-    document.documentElement.setAttribute('data-theme', t);
-    var mc = document.querySelector('meta[name="theme-color"]'); if (mc) mc.setAttribute('content', t === 'dark' ? '#0b1020' : '#eef1f8');
+    var root = document.documentElement, pal = A.palette();
+    root.setAttribute('data-theme', t);
+    if (root.getAttribute('data-palette') !== pal) root.setAttribute('data-palette', pal);
+    // цвет панели браузера и значок вкладки — в цветах палитры
+    var cs = getComputedStyle(root), cv = function (name, def) { return cs.getPropertyValue(name).trim() || def; };
+    var mc = document.querySelector('meta[name="theme-color"]'); if (mc) mc.setAttribute('content', cv('--bg', t === 'dark' ? '#0a0f1b' : '#eff1f7'));
+    var fav = document.querySelector('link[rel="icon"]'), c1 = cv('--accent', '#2468e8'), c2 = cv('--accent-2', '#098bb3');
+    if (fav && /^#[0-9a-f]{6}$/i.test(c1) && /^#[0-9a-f]{6}$/i.test(c2)) {
+      var href = FAVICON.replace('C1', '%23' + c1.slice(1)).replace('C2', '%23' + c2.slice(1));
+      if (fav.getAttribute('href') !== href) fav.setAttribute('href', href);
+    }
+    // отметка выбранной палитры и темы в открытых окнах выбора
+    U.qsa('.pal-card').forEach(function (el) { var on = el.getAttribute('data-palette') === pal; el.classList.toggle('on', on); el.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+    U.qsa('.theme-seg .seg-btn').forEach(function (el) { var on = el.getAttribute('data-theme-val') === t; el.classList.toggle('active', on); el.setAttribute('aria-pressed', on ? 'true' : 'false'); });
     // вместе с темой — остальной вид: ширина интерфейса и анимация фона
     document.body.classList.toggle('wide-ui', A.pref('wide') === '1');
     var bp = A.pref('bg');   // 'on' / 'off'; не задано — как решит сам фон (выключен, если система просит «меньше движения»)
@@ -453,6 +535,7 @@
     view.className = 'start';
     var box = h('div.start-box');
     view.appendChild(box);
+    view.appendChild(h('button.icon-btn.start-pal', { title: 'Оформление: тема и палитра', 'aria-label': 'Оформление', onclick: A.showAppearance }, I('palette')));
     box.appendChild(h('div.start-logo', h('span.logo', I('database', 30)), h('div', h('h1', C.title), h('p', 'Курс T-SQL для аналитиков: только SELECT, от первого запроса до оконных функций'))));
     var area = h('div.start-area'); box.appendChild(area);
     S.init().then(function (state) { drawStart(area, state); }).catch(function (e) { area.appendChild(h('div.err-box', 'Ошибка хранилища: ' + e.message)); });
@@ -884,19 +967,15 @@
         h('tr', h('td', 'Запусков запросов'), h('td', String(u.stats.runs) + ' (с ошибкой: ' + u.stats.errors + ')')),
         h('tr', h('td', 'Решено заданий'), h('td', String(u.stats.solved) + ' (с первой попытки: ' + u.stats.firstTry + ')')),
         h('tr', h('td', 'Лучшая серия дней'), h('td', String(u.streak.best || 0))))));
-    var theme = h('select.inp', h('option', { value: 'light' }, 'Светлая'), h('option', { value: 'dark' }, 'Тёмная'));
-    theme.value = u.settings.theme || 'light';
-    theme.addEventListener('change', function () {
-      u.settings.theme = theme.value;
-      try { localStorage.setItem('sqlkurs.theme', theme.value); } catch (e) { }
-      A.applyTheme(); A.save(); A.renderTop();
-    });
     var wideCb = h('input', { type: 'checkbox' }); wideCb.checked = A.pref('wide') === '1';
     wideCb.addEventListener('change', function () { A.setPref('wide', wideCb.checked ? '1' : '0'); window.dispatchEvent(new Event('resize')); });
     var bgCb = h('input', { type: 'checkbox' }); bgCb.checked = !!(G.Backdrop && G.Backdrop.active);
     bgCb.addEventListener('change', function () { A.setPref('bg', bgCb.checked ? 'on' : 'off'); });
-    page.appendChild(h('div.card.pad', h('h3', 'Настройки'),
-      h('label.inline', 'Тема оформления ', theme),
+    page.appendChild(h('div.card.pad.appearance', h('h3', 'Оформление'),
+      h('div.ap-row', h('span.ap-cap', 'Тема'), A.themeSwitch()),
+      h('div.ap-cap', 'Палитра'),
+      A.palettePicker(),
+      h('p.muted.small', 'Палитру и тему можно сменить в любой момент — кнопкой с палитрой вверху страницы.'),
       h('label.check', wideCb, h('span', 'Интерфейс во всю ширину экрана', h('small', 'иначе содержимое стоит по центру; на компьютере переключается и кнопкой ↔ вверху'))),
       h('label.check', bgCb, h('span', 'Анимация фона', h('small', 'фон за карточками плавно движется и отзывается на прокрутку и курсор; на слабом компьютере можно выключить')))));
     var fileInp = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' } });
